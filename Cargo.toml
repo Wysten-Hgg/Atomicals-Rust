@@ -1,0 +1,70 @@
+[package]
+name = "atomicals-rs"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "A Rust implementation of Atomicals protocol"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+anyhow = "1.0"
+bitcoin = { version = "0.30", features = ["rand", "serde"] }
+async-trait = "0.1"
+tracing = { version = "0.1", features = ["attributes"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "chrono"] }
+tracing-appender = "0.2"
+hex = "0.4"
+num_cpus = "1.15"
+bip39 = "2.0"
+secp256k1 = { version = "0.28", features = ["rand", "global-context"] }
+log = "0.4"
+chrono = "0.4"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3", features = [
+    "Window",
+    "Document",
+    "Element",
+    "HtmlElement",
+    "Node",
+    "console",
+    "Storage",
+    "Location",
+    "History",
+    "Response",
+    "RequestInit",
+    "RequestMode",
+    "Request",
+    "Headers",
+    "Crypto",
+    "CryptoKey",
+    "Performance",
+    "PerformanceTiming"
+] }
+serde-wasm-bindgen = "0.5"
+js-sys = "0.3"
+
+# 仅在非 WASM 目标使用的依赖
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { version = "1.0", features = ["full", "sync", "time", "macros", "rt-multi-thread"] }
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+
+# WASM 相关依赖
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1"
+getrandom = { version = "0.2", features = ["js"] }
+tracing-wasm = "0.2"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+
+[profile.dev]
+opt-level = 0
+debug = true 

@@ -1,0 +1,358 @@
+    Checking atomicals-rs v0.1.0 (/mnt/d/atom/atomicalsR)
+error[E0432]: unresolved import `crate::types::BitworkInfo`
+ --> src/operations/mining.rs:1:33
+  |
+1 | use crate::types::{AtomicalsTx, BitworkInfo};
+  |                                 ^^^^^^^^^^^ no `BitworkInfo` in `types`
+  |
+  = help: consider importing this struct instead:
+          crate::types::mint::BitworkInfo
+
+error[E0432]: unresolved import `crate::operations::mint_ft`
+ --> src/wasm/mod.rs:2:24
+  |
+2 | use crate::operations::mint_ft::mint_ft;
+  |                        ^^^^^^^ could not find `mint_ft` in `operations`
+
+error[E0432]: unresolved import `crate::types::BitworkInfo`
+  --> src/lib.rs:13:5
+   |
+13 |     BitworkInfo, MintConfig, MintResult
+   |     ^^^^^^^^^^^ no `BitworkInfo` in `types`
+   |
+   = help: consider importing this struct instead:
+           crate::types::mint::BitworkInfo
+
+error[E0433]: failed to resolve: use of undeclared crate or module `rayon`
+ --> src/operations/mining.rs:5:5
+  |
+5 | use rayon::prelude::*;
+  |     ^^^^^ use of undeclared crate or module `rayon`
+
+error[E0432]: unresolved import `crate::operations::mint_ft`
+  --> src/lib.rs:21:28
+   |
+21 | pub use crate::operations::mint_ft::mint_ft;
+   |                            ^^^^^^^ could not find `mint_ft` in `operations`
+
+error[E0432]: unresolved import `rand`
+ --> src/operations/mining.rs:4:5
+  |
+4 | use rand::{thread_rng, Rng};
+  |     ^^^^ help: a similar path exists: `secp256k1::rand`
+
+error[E0433]: failed to resolve: use of undeclared crate or module `rayon`
+  --> src/operations/mining.rs:59:16
+   |
+59 |     let pool = rayon::ThreadPoolBuilder::new()
+   |                ^^^^^ use of undeclared crate or module `rayon`
+
+error[E0425]: cannot find function `deserialize_hex` in module `bitcoin::consensus::encode`
+   --> src/wallet/web/unisat.rs:78:66
+    |
+78  |         let signed_tx: Transaction = bitcoin::consensus::encode::deserialize_hex(&signed_tx_hex)?;
+    |                                                                  ^^^^^^^^^^^^^^^ help: a function with a similar name exists: `serialize_hex`
+    |
+   ::: /home/ubuntu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitcoin-0.30.2/src/consensus/encode.rs:113:1
+    |
+113 | pub fn serialize_hex<T: Encodable + ?Sized>(data: &T) -> String {
+    | --------------------------------------------------------------- similarly named function `serialize_hex` defined here
+
+error[E0425]: cannot find function `deserialize_hex` in module `bitcoin::consensus::encode`
+   --> src/wallet/web/wizz.rs:78:66
+    |
+78  |         let signed_tx: Transaction = bitcoin::consensus::encode::deserialize_hex(&signed_tx_hex)?;
+    |                                                                  ^^^^^^^^^^^^^^^ help: a function with a similar name exists: `serialize_hex`
+    |
+   ::: /home/ubuntu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitcoin-0.30.2/src/consensus/encode.rs:113:1
+    |
+113 | pub fn serialize_hex<T: Encodable + ?Sized>(data: &T) -> String {
+    | --------------------------------------------------------------- similarly named function `serialize_hex` defined here
+
+warning: unused import: `AtomicalsTx`
+ --> src/operations/mining.rs:1:20
+  |
+1 | use crate::types::{AtomicalsTx, BitworkInfo};
+  |                    ^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+error[E0277]: `*mut u8` cannot be shared between threads safely
+    --> src/wallet/web/unisat.rs:49:25
+     |
+49   | impl WalletProvider for UnisatProvider {
+     |                         ^^^^^^^^^^^^^^ `*mut u8` cannot be shared between threads safely
+     |
+     = help: within `UnisatProvider`, the trait `Sync` is not implemented for `*mut u8`, which is required by `UnisatProvider: Sync`
+note: required because it appears within the type `PhantomData<*mut u8>`
+    --> /rustc/f6e511eec7342f59a25f7c0534f1dbea00d01b14/library/core/src/marker.rs:741:12
+note: required because it appears within the type `wasm_bindgen::JsValue`
+    --> /home/ubuntu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-bindgen-0.2.100/src/lib.rs:135:12
+     |
+135  | pub struct JsValue {
+     |            ^^^^^^^
+note: required because it appears within the type `js_sys::Object`
+    --> /home/ubuntu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/js-sys-0.3.77/src/lib.rs:3445:14
+     |
+3445 |     pub type Object;
+     |              ^^^^^^
+note: required because it appears within the type `EventTarget`
+    --> /home/ubuntu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/web-sys-0.3.77/src/features/gen_EventTarget.rs:14:14
+     |
+14   |     pub type EventTarget;
+     |              ^^^^^^^^^^^
+note: required because it appears within the type `Window`
+    --> /home/ubuntu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/web-sys-0.3.77/src/features/gen_Window.rs:14:14
+     |
+14   |     pub type Window;
+     |              ^^^^^^
+note: required because it appears within the type `UnisatProvider`
+    --> src/wallet/web/unisat.rs:30:12
+     |
+30   | pub struct UnisatProvider {
+     |            ^^^^^^^^^^^^^^
+note: required by a bound in `WalletProvider`
+    --> src/wallet/mod.rs:10:34
+     |
+10   | pub trait WalletProvider: Send + Sync {
+     |                                  ^^^^ required by this bound in `WalletProvider`
+
+error[E0277]: `*mut u8` cannot be sent between threads safely
+    --> src/wallet/web/unisat.rs:49:25
+     |
+49   | impl WalletProvider for UnisatProvider {
+     |                         ^^^^^^^^^^^^^^ `*mut u8` cannot be sent between threads safely
+     |
+     = help: within `UnisatProvider`, the trait `Send` is not implemented for `*mut u8`, which is required by `UnisatProvider: Send`
+note: required because it appears within the type `PhantomData<*mut u8>`
+    --> /rustc/f6e511eec7342f59a25f7c0534f1dbea00d01b14/library/core/src/marker.rs:741:12
+note: required because it appears within the type `wasm_bindgen::JsValue`
+    --> /home/ubuntu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-bindgen-0.2.100/src/lib.rs:135:12
+     |
+135  | pub struct JsValue {
+     |            ^^^^^^^
+note: required because it appears within the type `js_sys::Object`
+    --> /home/ubuntu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/js-sys-0.3.77/src/lib.rs:3445:14
+     |
+3445 |     pub type Object;
+     |              ^^^^^^
+note: required because it appears within the type `EventTarget`
+    --> /home/ubuntu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/web-sys-0.3.77/src/features/gen_EventTarget.rs:14:14
+     |
+14   |     pub type EventTarget;
+     |              ^^^^^^^^^^^
+note: required because it appears within the type `Window`
+    --> /home/ubuntu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/web-sys-0.3.77/src/features/gen_Window.rs:14:14
+     |
+14   |     pub type Window;
+     |              ^^^^^^
+note: required because it appears within the type `UnisatProvider`
+    --> src/wallet/web/unisat.rs:30:12
+     |
+30   | pub struct UnisatProvider {
+     |            ^^^^^^^^^^^^^^
+note: required by a bound in `WalletProvider`
+    --> src/wallet/mod.rs:10:27
+     |
+10   | pub trait WalletProvider: Send + Sync {
+     |                           ^^^^ required by this bound in `WalletProvider`
+
+error[E0277]: `*mut u8` cannot be shared between threads safely
+    --> src/wallet/web/wizz.rs:49:25
+     |
+49   | impl WalletProvider for WizzProvider {
+     |                         ^^^^^^^^^^^^ `*mut u8` cannot be shared between threads safely
+     |
+     = help: within `WizzProvider`, the trait `Sync` is not implemented for `*mut u8`, which is required by `WizzProvider: Sync`
+note: required because it appears within the type `PhantomData<*mut u8>`
+    --> /rustc/f6e511eec7342f59a25f7c0534f1dbea00d01b14/library/core/src/marker.rs:741:12
+note: required because it appears within the type `wasm_bindgen::JsValue`
+    --> /home/ubuntu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-bindgen-0.2.100/src/lib.rs:135:12
+     |
+135  | pub struct JsValue {
+     |            ^^^^^^^
+note: required because it appears within the type `js_sys::Object`
+    --> /home/ubuntu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/js-sys-0.3.77/src/lib.rs:3445:14
+     |
+3445 |     pub type Object;
+     |              ^^^^^^
+note: required because it appears within the type `EventTarget`
+    --> /home/ubuntu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/web-sys-0.3.77/src/features/gen_EventTarget.rs:14:14
+     |
+14   |     pub type EventTarget;
+     |              ^^^^^^^^^^^
+note: required because it appears within the type `Window`
+    --> /home/ubuntu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/web-sys-0.3.77/src/features/gen_Window.rs:14:14
+     |
+14   |     pub type Window;
+     |              ^^^^^^
+note: required because it appears within the type `WizzProvider`
+    --> src/wallet/web/wizz.rs:30:12
+     |
+30   | pub struct WizzProvider {
+     |            ^^^^^^^^^^^^
+note: required by a bound in `WalletProvider`
+    --> src/wallet/mod.rs:10:34
+     |
+10   | pub trait WalletProvider: Send + Sync {
+     |                                  ^^^^ required by this bound in `WalletProvider`
+
+error[E0277]: `*mut u8` cannot be sent between threads safely
+    --> src/wallet/web/wizz.rs:49:25
+     |
+49   | impl WalletProvider for WizzProvider {
+     |                         ^^^^^^^^^^^^ `*mut u8` cannot be sent between threads safely
+     |
+     = help: within `WizzProvider`, the trait `Send` is not implemented for `*mut u8`, which is required by `WizzProvider: Send`
+note: required because it appears within the type `PhantomData<*mut u8>`
+    --> /rustc/f6e511eec7342f59a25f7c0534f1dbea00d01b14/library/core/src/marker.rs:741:12
+note: required because it appears within the type `wasm_bindgen::JsValue`
+    --> /home/ubuntu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-bindgen-0.2.100/src/lib.rs:135:12
+     |
+135  | pub struct JsValue {
+     |            ^^^^^^^
+note: required because it appears within the type `js_sys::Object`
+    --> /home/ubuntu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/js-sys-0.3.77/src/lib.rs:3445:14
+     |
+3445 |     pub type Object;
+     |              ^^^^^^
+note: required because it appears within the type `EventTarget`
+    --> /home/ubuntu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/web-sys-0.3.77/src/features/gen_EventTarget.rs:14:14
+     |
+14   |     pub type EventTarget;
+     |              ^^^^^^^^^^^
+note: required because it appears within the type `Window`
+    --> /home/ubuntu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/web-sys-0.3.77/src/features/gen_Window.rs:14:14
+     |
+14   |     pub type Window;
+     |              ^^^^^^
+note: required because it appears within the type `WizzProvider`
+    --> src/wallet/web/wizz.rs:30:12
+     |
+30   | pub struct WizzProvider {
+     |            ^^^^^^^^^^^^
+note: required by a bound in `WalletProvider`
+    --> src/wallet/mod.rs:10:27
+     |
+10   | pub trait WalletProvider: Send + Sync {
+     |                           ^^^^ required by this bound in `WalletProvider`
+
+error[E0308]: mismatched types
+   --> src/operations/mining.rs:163:20
+    |
+163 |         lock_time: 0,
+    |                    ^ expected `LockTime`, found integer
+
+error[E0599]: no function or associated item named `new_op_return` found for struct `bitcoin::Script` in the current scope
+   --> src/operations/mining.rs:170:39
+    |
+170 |         let script = bitcoin::Script::new_op_return(&data);
+    |                                       ^^^^^^^^^^^^^ function or associated item not found in `Script`
+    |
+help: there is a method `is_op_return` with a similar name, but with different arguments
+   --> /home/ubuntu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitcoin-0.30.2/src/blockdata/script/borrowed.rs:297:5
+    |
+297 |     pub fn is_op_return (&self) -> bool {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0277]: the trait bound `wasm_bindgen::JsValue: StdError` is not satisfied
+  --> src/wallet/web/unisat.rs:53:51
+   |
+53 |         let result = JsFuture::from(promise).await?;
+   |                                                   ^ the trait `StdError` is not implemented for `wasm_bindgen::JsValue`, which is required by `std::result::Result<std::string::String, Box<dyn StdError>>: FromResidual<std::result::Result<Infallible, wasm_bindgen::JsValue>>`
+   |
+   = help: the trait `FromResidual<std::result::Result<Infallible, E>>` is implemented for `std::result::Result<T, F>`
+   = note: required for `Box<dyn StdError>` to implement `From<wasm_bindgen::JsValue>`
+   = note: required for `std::result::Result<std::string::String, Box<dyn StdError>>` to implement `FromResidual<std::result::Result<Infallible, wasm_bindgen::JsValue>>`
+
+error[E0277]: the trait bound `wasm_bindgen::JsValue: StdError` is not satisfied
+  --> src/wallet/web/unisat.rs:60:51
+   |
+60 |         let result = JsFuture::from(promise).await?;
+   |                                                   ^ the trait `StdError` is not implemented for `wasm_bindgen::JsValue`, which is required by `std::result::Result<std::string::String, Box<dyn StdError>>: FromResidual<std::result::Result<Infallible, wasm_bindgen::JsValue>>`
+   |
+   = help: the trait `FromResidual<std::result::Result<Infallible, E>>` is implemented for `std::result::Result<T, F>`
+   = note: required for `Box<dyn StdError>` to implement `From<wasm_bindgen::JsValue>`
+   = note: required for `std::result::Result<std::string::String, Box<dyn StdError>>` to implement `FromResidual<std::result::Result<Infallible, wasm_bindgen::JsValue>>`
+
+error[E0277]: the trait bound `wasm_bindgen::JsValue: StdError` is not satisfied
+  --> src/wallet/web/unisat.rs:74:51
+   |
+74 |         let result = JsFuture::from(promise).await?;
+   |                                                   ^ the trait `StdError` is not implemented for `wasm_bindgen::JsValue`, which is required by `std::result::Result<AtomicalsTx, Box<dyn StdError>>: FromResidual<std::result::Result<Infallible, wasm_bindgen::JsValue>>`
+   |
+   = help: the trait `FromResidual<std::result::Result<Infallible, E>>` is implemented for `std::result::Result<T, F>`
+   = note: required for `Box<dyn StdError>` to implement `From<wasm_bindgen::JsValue>`
+   = note: required for `std::result::Result<AtomicalsTx, Box<dyn StdError>>` to implement `FromResidual<std::result::Result<Infallible, wasm_bindgen::JsValue>>`
+
+error[E0277]: the trait bound `wasm_bindgen::JsValue: StdError` is not satisfied
+  --> src/wallet/web/unisat.rs:90:51
+   |
+90 |         let result = JsFuture::from(promise).await?;
+   |                                                   ^ the trait `StdError` is not implemented for `wasm_bindgen::JsValue`, which is required by `std::result::Result<std::string::String, Box<dyn StdError>>: FromResidual<std::result::Result<Infallible, wasm_bindgen::JsValue>>`
+   |
+   = help: the trait `FromResidual<std::result::Result<Infallible, E>>` is implemented for `std::result::Result<T, F>`
+   = note: required for `Box<dyn StdError>` to implement `From<wasm_bindgen::JsValue>`
+   = note: required for `std::result::Result<std::string::String, Box<dyn StdError>>` to implement `FromResidual<std::result::Result<Infallible, wasm_bindgen::JsValue>>`
+
+error[E0277]: the trait bound `wasm_bindgen::JsValue: StdError` is not satisfied
+  --> src/wallet/web/wizz.rs:53:51
+   |
+53 |         let result = JsFuture::from(promise).await?;
+   |                                                   ^ the trait `StdError` is not implemented for `wasm_bindgen::JsValue`, which is required by `std::result::Result<std::string::String, Box<dyn StdError>>: FromResidual<std::result::Result<Infallible, wasm_bindgen::JsValue>>`
+   |
+   = help: the trait `FromResidual<std::result::Result<Infallible, E>>` is implemented for `std::result::Result<T, F>`
+   = note: required for `Box<dyn StdError>` to implement `From<wasm_bindgen::JsValue>`
+   = note: required for `std::result::Result<std::string::String, Box<dyn StdError>>` to implement `FromResidual<std::result::Result<Infallible, wasm_bindgen::JsValue>>`
+
+error[E0277]: the trait bound `wasm_bindgen::JsValue: StdError` is not satisfied
+  --> src/wallet/web/wizz.rs:60:51
+   |
+60 |         let result = JsFuture::from(promise).await?;
+   |                                                   ^ the trait `StdError` is not implemented for `wasm_bindgen::JsValue`, which is required by `std::result::Result<std::string::String, Box<dyn StdError>>: FromResidual<std::result::Result<Infallible, wasm_bindgen::JsValue>>`
+   |
+   = help: the trait `FromResidual<std::result::Result<Infallible, E>>` is implemented for `std::result::Result<T, F>`
+   = note: required for `Box<dyn StdError>` to implement `From<wasm_bindgen::JsValue>`
+   = note: required for `std::result::Result<std::string::String, Box<dyn StdError>>` to implement `FromResidual<std::result::Result<Infallible, wasm_bindgen::JsValue>>`
+
+error[E0277]: the trait bound `wasm_bindgen::JsValue: StdError` is not satisfied
+  --> src/wallet/web/wizz.rs:74:51
+   |
+74 |         let result = JsFuture::from(promise).await?;
+   |                                                   ^ the trait `StdError` is not implemented for `wasm_bindgen::JsValue`, which is required by `std::result::Result<AtomicalsTx, Box<dyn StdError>>: FromResidual<std::result::Result<Infallible, wasm_bindgen::JsValue>>`
+   |
+   = help: the trait `FromResidual<std::result::Result<Infallible, E>>` is implemented for `std::result::Result<T, F>`
+   = note: required for `Box<dyn StdError>` to implement `From<wasm_bindgen::JsValue>`
+   = note: required for `std::result::Result<AtomicalsTx, Box<dyn StdError>>` to implement `FromResidual<std::result::Result<Infallible, wasm_bindgen::JsValue>>`
+
+error[E0277]: the trait bound `wasm_bindgen::JsValue: StdError` is not satisfied
+  --> src/wallet/web/wizz.rs:90:51
+   |
+90 |         let result = JsFuture::from(promise).await?;
+   |                                                   ^ the trait `StdError` is not implemented for `wasm_bindgen::JsValue`, which is required by `std::result::Result<std::string::String, Box<dyn StdError>>: FromResidual<std::result::Result<Infallible, wasm_bindgen::JsValue>>`
+   |
+   = help: the trait `FromResidual<std::result::Result<Infallible, E>>` is implemented for `std::result::Result<T, F>`
+   = note: required for `Box<dyn StdError>` to implement `From<wasm_bindgen::JsValue>`
+   = note: required for `std::result::Result<std::string::String, Box<dyn StdError>>` to implement `FromResidual<std::result::Result<Infallible, wasm_bindgen::JsValue>>`
+
+error[E0382]: borrow of moved value: `prefix`
+  --> src/types/mint.rs:31:25
+   |
+27 |     pub fn new(prefix: String) -> Self {
+   |                ------ move occurs because `prefix` has type `std::string::String`, which does not implement the `Copy` trait
+28 |         Self {
+29 |             prefix,
+   |             ------ value moved here
+30 |             ext: None,
+31 |             difficulty: prefix.len() as u32 * 4, // Each hex char is 4 bits
+   |                         ^^^^^^ value borrowed here after move
+   |
+help: consider cloning the value if the performance cost is acceptable
+   |
+29 |             prefix: prefix.clone(),
+   |                   ++++++++++++++++
+
+Some errors have detailed explanations: E0277, E0308, E0382, E0425, E0432, E0433, E0599.
+For more information about an error, try `rustc --explain E0277`.
+warning: `atomicals-rs` (lib) generated 1 warning
+error: could not compile `atomicals-rs` (lib) due to 24 previous errors; 1 warning emitted
