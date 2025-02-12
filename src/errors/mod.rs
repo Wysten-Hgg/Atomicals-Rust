@@ -1,76 +1,55 @@
-use std::fmt;
 use std::error::Error as StdError;
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum Error {
-    // General errors
+    #[error("Invalid amount: {0}")]
     InvalidAmount(String),
+    
+    #[error("Invalid ticker: {0}")]
     InvalidTicker(String),
+    
+    #[error("Invalid bitwork: {0}")]
     InvalidBitwork(String),
     
-    // Wallet errors
+    #[error("Wallet not found: {0}")]
     WalletNotFound(String),
+    
+    #[error("Signing error: {0}")]
     SigningError(String),
+    
+    #[error("Broadcast error: {0}")]
     BroadcastError(String),
     
-    // Mining errors
+    #[error("Wallet error: {0}")]
+    WalletError(String),
+    
+    #[error("Mining timeout: {0}")]
     MiningTimeout(String),
+    
+    #[error("Mining error: {0}")]
     MiningError(String),
     
-    // Bitcoin errors
-    BitcoinError(bitcoin::Error),
+    #[error("Bitcoin error: {0}")]
+    BitcoinError(#[from] bitcoin::Error),
     
-    // External errors
+    #[error("WASM error: {0}")]
     WasmError(String),
-    SerdeError(String),
-    IoError(std::io::Error),
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::InvalidAmount(msg) => write!(f, "Invalid amount: {}", msg),
-            Error::InvalidTicker(msg) => write!(f, "Invalid ticker: {}", msg),
-            Error::InvalidBitwork(msg) => write!(f, "Invalid bitwork: {}", msg),
-            Error::WalletNotFound(msg) => write!(f, "Wallet not found: {}", msg),
-            Error::SigningError(msg) => write!(f, "Signing error: {}", msg),
-            Error::BroadcastError(msg) => write!(f, "Broadcast error: {}", msg),
-            Error::MiningTimeout(msg) => write!(f, "Mining timeout: {}", msg),
-            Error::MiningError(msg) => write!(f, "Mining error: {}", msg),
-            Error::BitcoinError(e) => write!(f, "Bitcoin error: {}", e),
-            Error::WasmError(msg) => write!(f, "WASM error: {}", msg),
-            Error::SerdeError(msg) => write!(f, "Serialization error: {}", msg),
-            Error::IoError(e) => write!(f, "IO error: {}", e),
-        }
-    }
-}
-
-impl StdError for Error {
-    fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        match self {
-            Error::BitcoinError(e) => Some(e),
-            Error::IoError(e) => Some(e),
-            _ => None,
-        }
-    }
-}
-
-impl From<bitcoin::Error> for Error {
-    fn from(err: bitcoin::Error) -> Self {
-        Error::BitcoinError(err)
-    }
-}
-
-impl From<std::io::Error> for Error {
-    fn from(err: std::io::Error) -> Self {
-        Error::IoError(err)
-    }
-}
-
-impl From<serde_json::Error> for Error {
-    fn from(err: serde_json::Error) -> Self {
-        Error::SerdeError(err.to_string())
-    }
+    
+    #[error("Serialization error: {0}")]
+    SerdeError(#[from] serde_json::Error),
+    
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
+    
+    #[error("Generic error: {0}")]
+    Generic(Box<dyn StdError + Send + Sync>),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
+
+impl From<Box<dyn StdError + Send + Sync>> for Error {
+    fn from(err: Box<dyn StdError + Send + Sync>) -> Self {
+        Error::Generic(err)
+    }
+}

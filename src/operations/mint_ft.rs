@@ -1,9 +1,20 @@
-use crate::errors::Result;
+use crate::errors::{Error, Result};
 use crate::operations::mining::{mine_transaction, MiningOptions};
-use crate::types::{Arc20Config, Arc20Token, AtomicalsTx, BitworkInfo};
+use crate::types::{Arc20Config, Arc20Token, AtomicalsTx, mint::BitworkInfo};
 use crate::wallet::WalletProvider;
-use bitcoin::{Script, Transaction, TxIn, TxOut};
-use serde_json::json;
+use bitcoin::{Transaction, TxIn, TxOut, ScriptBuf};
+use bitcoin::opcodes::all::OP_RETURN;
+use bitcoin::locktime::absolute::LockTime;
+use serde::{Serialize, Deserialize};
+use std::error::Error as StdError;
+
+#[derive(Debug, Serialize, Deserialize)]
+struct MintData {
+    p: String,
+    op: String,
+    tick: String,
+    amt: u64,
+}
 
 pub async fn mint_ft<W: WalletProvider>(
     wallet: &W,
@@ -11,23 +22,34 @@ pub async fn mint_ft<W: WalletProvider>(
     mining_options: Option<MiningOptions>,
 ) -> Result<AtomicalsTx> {
     // Get wallet address
-    let address = wallet.get_address().await?;
-
+    let address = wallet.get_address().await.map_err(|e| Error::WalletError(e.to_string()))?;
+    
     // Create mint data
-    let mint_data = json!({
-        "p": "arc20",
-        "op": "mint",
-        "tick": config.tick,
-        "amt": config.mint_amount.0,
-    });
-
-    // Create output script
-    let script = Script::new_op_return(&serde_json::to_vec(&mint_data)?);
+    let mint_data = MintData {
+        p: "arc20".to_string(),
+        op: "mint".to_string(),
+        tick: config.tick.clone(),
+        amt: config.mint_amount.0,
+    };
+    
+    // Create data payload
+    let payload = serde_json::to_vec(&mint_data).map_err(|e| Error::from(e))?;
+    
+    // Create OP_RETURN script
+    let mut builder = ScriptBuf::builder();
+    builder = builder.push_opcode(OP_RETURN);
+    
+    // Split payload into chunks that fit within push limits
+    for chunk in payload.chunks(75) {
+        builder = builder.push_slice(chunk);
+    }
+    
+    let script = builder.into_script();
     
     // Create transaction template
     let mut tx = Transaction {
         version: 2,
-        lock_time: 0,
+        lock_time: LockTime::ZERO,
         input: vec![TxIn::default()], // Will be filled by wallet
         output: vec![
             TxOut {
@@ -48,8 +70,8 @@ pub async fn mint_ft<W: WalletProvider>(
     }
 
     // Sign and broadcast transaction
-    let signed_tx = wallet.sign_transaction(tx, &[]).await?;
-    let txid = wallet.broadcast_transaction(signed_tx).await?;
+    let signed_tx = wallet.sign_transaction(tx, &[]).await.map_err(|e| Error::WalletError(e.to_string()))?;
+    let txid = wallet.broadcast_transaction(signed_tx).await.map_err(|e| Error::WalletError(e.to_string()))?;
 
     // Create token instance
     let mut token = Arc20Token::new(config);

@@ -1,5 +1,7 @@
 use crate::types::{AtomicalsTx, mint::BitworkInfo};
-use bitcoin::{Transaction, TxIn, TxOut, Script, LockTime};
+use crate::errors::{Error, Result};
+use bitcoin::{Transaction, TxIn, TxOut, Script};
+use bitcoin::locktime::absolute::LockTime;
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
 use serde_json::json;
