@@ -19,19 +19,18 @@ impl AtomicalsWasm {
     pub async fn mint_ft(
         &self,
         tick: String,
-        max_supply: u64,
-        mint_amount: u64,
-        mint_height: u32,
-        max_mints: u32,
+        mint_amount: f64,
         mint_bitworkc: Option<String>,
     ) -> Result<String, JsValue> {
+        // Validate input
+        if mint_amount <= 0.0 || mint_amount.fract() != 0.0 {
+            return Err(JsValue::from_str("Mint amount must be a positive integer"));
+        }
+
         // Create config
         let config = Arc20Config::new(
             tick,
-            Amount(max_supply),
-            Amount(mint_amount),
-            mint_height,
-            max_mints,
+            Amount(mint_amount as u64),
         ).map_err(|e| JsValue::from_str(&e.to_string()))?;
 
         // Add bitwork if provided

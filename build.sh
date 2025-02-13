@@ -15,11 +15,13 @@ echo "Building WebAssembly with wasm-pack..."
 # 添加 --verbose 参数来获取更多输出信息
 wasm-pack build --target web --verbose
 
-echo "Creating dist directory..."
-mkdir -p dist
+# echo "Creating dist directory..."
+# mkdir -p dist
 
+echo "delete files"
+rm -rf dist/atomicals*
 echo "Copying files to dist directory..."
 cp -r pkg/* dist/
-cp examples/index.html dist/
+# cp examples/index.html dist/
 
 echo "Build completed successfully!"
