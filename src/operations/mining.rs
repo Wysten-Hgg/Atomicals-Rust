@@ -45,12 +45,25 @@ pub fn mine_transaction(
     bitwork: BitworkInfo,
     options: MiningOptions,
 ) -> Result<MiningResult> {
+    web_sys::console::log_1(&format!("Starting mining with difficulty: {}", bitwork.difficulty).into());
+    
     // Validate transaction size
     let tx_size = bitcoin::consensus::encode::serialize(&tx).len();
     if tx_size > MAX_TRANSACTION_SIZE {
         return Err(Error::MiningError(
             format!("Transaction size {} exceeds maximum {}", tx_size, MAX_TRANSACTION_SIZE)
         ));
+    }
+
+    // Add a dummy input for nonce if no inputs exist
+    if tx.input.is_empty() {
+        web_sys::console::log_1(&"Adding dummy input for nonce".into());
+        tx.input.push(TxIn {
+            previous_output: bitcoin::OutPoint::null(),
+            script_sig: Script::empty().into(),
+            sequence: bitcoin::Sequence(0),
+            witness: bitcoin::Witness::default(),
+        });
     }
 
     let start_time = Instant::now();
@@ -62,6 +75,8 @@ pub fn mine_transaction(
         .num_threads(options.threads)
         .build()
         .map_err(|e| Error::MiningError(format!("Failed to create thread pool: {}", e)))?;
+
+    web_sys::console::log_1(&format!("Created mining pool with {} threads", options.threads).into());
 
     // Split the nonce range into chunks for each thread
     let chunks: Vec<_> = (0..options.threads)
@@ -94,6 +109,7 @@ pub fn mine_transaction(
                     
                     // Check timeout
                     if start_time.elapsed().as_secs() > options.timeout_secs {
+                        web_sys::console::log_1(&"Mining timeout reached".into());
                         found.store(true, Ordering::Relaxed);
                         break;
                     }
@@ -112,8 +128,17 @@ pub fn mine_transaction(
                     let txid = tx_attempt.txid().to_string();
                     attempts.fetch_add(1, Ordering::Relaxed);
 
+                    if attempts.load(Ordering::Relaxed) % 1000 == 0 {
+                        web_sys::console::log_1(&format!(
+                            "Mining progress: {} attempts, current txid: {}", 
+                            attempts.load(Ordering::Relaxed), 
+                            txid
+                        ).into());
+                    }
+
                     // Check if txid matches bitwork requirements
                     if bitwork.matches(&txid) {
+                        web_sys::console::log_1(&format!("Found matching txid: {}", txid).into());
                         found.store(true, Ordering::Relaxed);
                         let duration = start_time.elapsed();
                         let total_attempts = attempts.load(Ordering::Relaxed);
@@ -138,11 +163,27 @@ pub fn mine_transaction(
     // Drop the original sender to close the channel
     drop(tx_sender);
 
+    web_sys::console::log_1(&"Waiting for mining result...".into());
+
     // Get the result
     match rx_receiver.recv() {
-        Ok(Some(result)) => Ok(result),
-        Ok(None) => Err(Error::MiningError("Mining failed: no result found".into())),
-        Err(_) => Err(Error::MiningError("Mining failed: channel closed".into())),
+        Ok(Some(result)) => {
+            web_sys::console::log_1(&format!(
+                "Mining completed: {} attempts in {:?}, hash rate: {:.2} H/s",
+                result.attempts,
+                result.duration,
+                result.hash_rate
+            ).into());
+            Ok(result)
+        },
+        Ok(None) => {
+            web_sys::console::error_1(&"Mining failed: no result found".into());
+            Err(Error::MiningError("Mining failed: no result found".into()))
+        },
+        Err(_) => {
+            web_sys::console::error_1(&"Mining failed: channel closed".into());
+            Err(Error::MiningError("Mining failed: channel closed".into()))
+        },
     }
 }
 
