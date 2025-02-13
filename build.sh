@@ -20,6 +20,6 @@ mkdir -p dist
 
 echo "Copying files to dist directory..."
 cp -r pkg/* dist/
-cp examples/web/index.html dist/
+cp examples/index.html dist/
 
 echo "Build completed successfully!"

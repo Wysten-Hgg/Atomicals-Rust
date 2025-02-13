@@ -59,8 +59,15 @@ impl AtomicalsWasm {
 
         // Return transaction ID
         match result {
-            Ok(tx) => Ok(tx.txid()),
-            Err(e) => Err(JsValue::from_str(&e.to_string())),
+            Ok(tx) => {
+                let txid = tx.txid();
+                web_sys::console::log_1(&format!("Successfully minted FT with txid: {}", txid).into());
+                Ok(txid)
+            },
+            Err(e) => {
+                web_sys::console::error_1(&format!("Failed to mint FT: {}", e).into());
+                Err(JsValue::from_str(&format!("Failed to mint FT: {}", e)))
+            },
         }
     }
 }

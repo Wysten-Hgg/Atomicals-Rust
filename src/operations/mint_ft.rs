@@ -57,19 +57,16 @@ pub async fn mint_ft<W: WalletProvider>(
     let script = builder.into_script();
     
     // Create transaction template
-    let mut inputs = vec![TxIn::default()]; // Will be filled by wallet
-    let mut outputs = vec![
-        TxOut {
-            value: 0,
-            script_pubkey: script,
-        }
-    ];
-
     let mut tx = Transaction {
         version: 2,
         lock_time: LockTime::ZERO,
-        input: inputs,
-        output: outputs,
+        input: vec![], // Empty inputs, will be filled by wallet
+        output: vec![
+            TxOut {
+                value: 1000, // Minimum output value
+                script_pubkey: script,
+            }
+        ],
     };
 
     // If mining is required
@@ -82,8 +79,9 @@ pub async fn mint_ft<W: WalletProvider>(
         tx = mining_result.transaction;
     }
 
-    // Sign the transaction
-    let signed_tx = wallet.sign_transaction(tx.clone(), &[]).await.map_err(|e| Error::WalletError(e.to_string()))?;
+    // Sign the transaction with UTXOs
+    let signed_tx = wallet.sign_transaction(tx, &[]).await
+        .map_err(|e| Error::WalletError(format!("Failed to sign transaction: {}", e)))?;
 
     // Get the transaction ID
     let txid = signed_tx.txid().to_string();
