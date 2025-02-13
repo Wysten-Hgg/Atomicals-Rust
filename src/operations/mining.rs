@@ -1,7 +1,7 @@
 use crate::types::{AtomicalsTx, mint::BitworkInfo};
 use crate::errors::{Error, Result};
 use bitcoin::{Transaction, TxIn, TxOut, Script};
-use bitcoin::locktime::absolute::LockTime;
+use bitcoin::absolute::LockTime;
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
 use serde_json::json;
@@ -105,7 +105,7 @@ pub fn mine_transaction(
                     // Update nonce in transaction
                     let mut tx_attempt = tx_clone.clone();
                     if let Some(input) = tx_attempt.input.get_mut(0) {
-                        input.sequence = nonce;
+                        input.sequence = bitcoin::Sequence(nonce);
                     }
 
                     // Calculate txid
@@ -162,14 +162,19 @@ pub fn create_mining_tx(
 
     let mut tx = Transaction {
         version: 2,
-        lock_time: 0,
+        lock_time: LockTime::ZERO,
         input: inputs,
         output: outputs,
     };
 
     // Add OP_RETURN output with mining data if provided
     if !data.is_empty() {
-        let script = bitcoin::Script::new_op_return(&data);
+        let mut array = [0u8; 32];
+        array[..data.len().min(32)].copy_from_slice(&data[..data.len().min(32)]);
+        let script = bitcoin::script::Builder::new()
+            .push_opcode(bitcoin::opcodes::all::OP_RETURN)
+            .push_slice(&array)
+            .into_script();
         tx.output.push(TxOut {
             value: 0,
             script_pubkey: script,

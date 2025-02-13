@@ -1,94 +1,98 @@
-use crate::errors::{Error, Result};
-use crate::types::AtomicalsTx;
-use crate::wallet::WalletProvider;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{window, Window};
+use js_sys::{Promise, Array};
+use web_sys::Window;
+use crate::errors::{Error, Result};
+use crate::wallet::WalletProvider;
 use bitcoin::{Transaction, TxOut};
-use hex;
 use async_trait::async_trait;
 
 #[wasm_bindgen]
 extern "C" {
-    type WizzWallet;
+    #[wasm_bindgen(js_name = "Wizz")]
+    type Wizz;
 
-    #[wasm_bindgen(js_namespace = window)]
-    fn wizz() -> WizzWallet;
-
-    #[wasm_bindgen(method, js_name = "getPublicKey")]
-    fn get_public_key(this: &WizzWallet) -> js_sys::Promise;
-
-    #[wasm_bindgen(method, js_name = "getAddress")]
-    fn get_address(this: &WizzWallet) -> js_sys::Promise;
+    #[wasm_bindgen(method, js_name = "getAccounts")]
+    fn get_accounts(this: &Wizz) -> Promise;
 
     #[wasm_bindgen(method, js_name = "signTransaction")]
-    fn sign_transaction(this: &WizzWallet, tx: &str, inputs: &JsValue) -> js_sys::Promise;
+    fn sign_transaction(this: &Wizz, tx_hex: &str) -> Promise;
 
-    #[wasm_bindgen(method, js_name = "broadcastTransaction")]
-    fn broadcast_transaction(this: &WizzWallet, raw_tx: &str) -> js_sys::Promise;
+    #[wasm_bindgen(method, js_name = "sendTransaction")]
+    fn send_transaction(this: &Wizz, tx_hex: &str) -> Promise;
 }
 
+#[derive(Clone)]
 pub struct WizzProvider {
     window: Window,
 }
 
 impl WizzProvider {
-    pub fn new() -> Option<Self> {
-        window().map(|w| Self { window: w })
+    pub fn new() -> Result<Self> {
+        let window = web_sys::window()
+            .ok_or_else(|| Error::WasmError("Failed to get window".to_string()))?;
+        Ok(Self { window })
     }
 
-    fn get_wizz(&self) -> Result<WizzWallet> {
-        self.window
-            .get("wizz")
-            .ok_or_else(|| Error::WalletError("Wizz not found".to_string()))
-            .and_then(|val| val.dyn_into::<WizzWallet>().map_err(|_| Error::WalletError("Invalid Wizz instance".to_string())))
+    fn get_wizz(&self) -> Result<Wizz> {
+        let wizz = js_sys::Reflect::get(&self.window, &"wizz".into())
+            .map_err(|e| Error::WasmError(format!("Failed to get wizz: {:?}", e)))?;
+        Ok(wizz.unchecked_into())
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[async_trait(?Send)]
 impl WalletProvider for WizzProvider {
     async fn get_public_key(&self) -> Result<String> {
         let wizz = self.get_wizz()?;
-        let promise = wizz.get_public_key();
-        let result = JsFuture::from(promise).await
-            .map_err(|e| Error::WalletError(format!("Failed to get public key: {:?}", e)))?;
-        let public_key = result.as_string()
-            .ok_or_else(|| Error::WalletError("Invalid public key".to_string()))?;
-        Ok(public_key)
+        let accounts = JsFuture::from(wizz.get_accounts()).await
+            .map_err(|e| Error::WasmError(format!("Failed to get accounts: {:?}", e)))?;
+        let accounts_array = Array::from(&accounts);
+        if accounts_array.length() == 0 {
+            return Err(Error::WalletError("No accounts found".to_string()));
+        }
+        let address = accounts_array.get(0)
+            .as_string()
+            .ok_or_else(|| Error::WalletError("Invalid address format".to_string()))?;
+        Ok(address)
     }
 
     async fn get_address(&self) -> Result<String> {
         let wizz = self.get_wizz()?;
-        let promise = wizz.get_address();
-        let result = JsFuture::from(promise).await
-            .map_err(|e| Error::WalletError(format!("Failed to get address: {:?}", e)))?;
-        let address = result.as_string()
-            .ok_or_else(|| Error::WalletError("Invalid address".to_string()))?;
+        let accounts = JsFuture::from(wizz.get_accounts()).await
+            .map_err(|e| Error::WasmError(format!("Failed to get accounts: {:?}", e)))?;
+        let accounts_array = Array::from(&accounts);
+        if accounts_array.length() == 0 {
+            return Err(Error::WalletError("No accounts found".to_string()));
+        }
+        let address = accounts_array.get(0)
+            .as_string()
+            .ok_or_else(|| Error::WalletError("Invalid address format".to_string()))?;
         Ok(address)
     }
 
-    async fn sign_transaction(&self, tx: Transaction, input_txouts: &[TxOut]) -> Result<AtomicalsTx> {
+    async fn sign_transaction(&self, tx: Transaction, _input_txouts: &[TxOut]) -> Result<Transaction> {
         let wizz = self.get_wizz()?;
         let tx_hex = bitcoin::consensus::encode::serialize_hex(&tx);
-        let inputs = serde_wasm_bindgen::to_value(&input_txouts)?;
-        let promise = wizz.sign_transaction(&tx_hex, &inputs);
-        let result = JsFuture::from(promise).await
-            .map_err(|e| Error::WalletError(format!("Failed to sign transaction: {:?}", e)))?;
+        let result = JsFuture::from(wizz.sign_transaction(&tx_hex)).await
+            .map_err(|e| Error::WasmError(format!("Failed to sign transaction: {:?}", e)))?;
         let signed_tx_hex = result.as_string()
-            .ok_or_else(|| Error::WalletError("Invalid signed transaction".to_string()))?;
-        let signed_tx: Transaction = bitcoin::consensus::encode::deserialize(&hex::decode(&signed_tx_hex)?)?;
-        Ok(AtomicalsTx::new(signed_tx, input_txouts.to_vec()))
+            .ok_or_else(|| Error::WalletError("Invalid signed transaction format".to_string()))?;
+        
+        let signed_tx_bytes = hex::decode(&signed_tx_hex)
+            .map_err(|e| Error::Generic(Box::new(e)))?;
+        let signed_tx = bitcoin::consensus::encode::deserialize(&signed_tx_bytes)
+            .map_err(|e| Error::Generic(Box::new(e)))?;
+        Ok(signed_tx)
     }
 
-    async fn broadcast_transaction(&self, tx: AtomicalsTx) -> Result<String> {
+    async fn broadcast_transaction(&self, tx: Transaction) -> Result<String> {
         let wizz = self.get_wizz()?;
-        let tx_hex = bitcoin::consensus::encode::serialize_hex(&tx.raw_tx);
-        let promise = wizz.broadcast_transaction(&tx_hex);
-        let result = JsFuture::from(promise).await
-            .map_err(|e| Error::WalletError(format!("Failed to broadcast transaction: {:?}", e)))?;
+        let tx_hex = bitcoin::consensus::encode::serialize_hex(&tx);
+        let result = JsFuture::from(wizz.send_transaction(&tx_hex)).await
+            .map_err(|e| Error::WasmError(format!("Failed to broadcast transaction: {:?}", e)))?;
         let txid = result.as_string()
-            .ok_or_else(|| Error::WalletError("Invalid transaction ID".to_string()))?;
+            .ok_or_else(|| Error::WalletError("Invalid transaction ID format".to_string()))?;
         Ok(txid)
     }
 }

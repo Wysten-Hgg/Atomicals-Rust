@@ -13,17 +13,17 @@ warning: unused import: `Script`
 3 | use bitcoin::{Transaction, TxIn, TxOut, Script};
   |                                         ^^^^^^
 
-warning: unused import: `bitcoin::locktime::absolute::LockTime`
- --> src/operations/mining.rs:4:5
-  |
-4 | use bitcoin::locktime::absolute::LockTime;
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
 warning: unused import: `serde_json::json`
  --> src/operations/mining.rs:7:5
   |
 7 | use serde_json::json;
   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `ScriptBuf`
+ --> src/operations/mint_ft.rs:5:41
+  |
+5 | use bitcoin::{Transaction, TxIn, TxOut, ScriptBuf};
+  |                                         ^^^^^^^^^
 
 warning: unused import: `std::error::Error as StdError`
  --> src/operations/mint_ft.rs:9:5
@@ -31,11 +31,23 @@ warning: unused import: `std::error::Error as StdError`
 9 | use std::error::Error as StdError;
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-warning: unused import: `async_trait::async_trait`
- --> src/wallet/mod.rs:4:5
+warning: unused import: `crate::types::AtomicalsTx`
+ --> src/wallet/web/unisat.rs:2:5
   |
-4 | use async_trait::async_trait;
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^
+2 | use crate::types::AtomicalsTx;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `Window` and `window`
+ --> src/wallet/web/unisat.rs:6:15
+  |
+6 | use web_sys::{window, Window};
+  |               ^^^^^^  ^^^^^^
+
+warning: unused import: `serde_wasm_bindgen`
+ --> src/wallet/web/unisat.rs:9:5
+  |
+9 | use serde_wasm_bindgen;
+  |     ^^^^^^^^^^^^^^^^^^
 
 warning: unused import: `crate::types::AtomicalsTx`
  --> src/wallet/mod.rs:6:5
@@ -43,352 +55,23 @@ warning: unused import: `crate::types::AtomicalsTx`
 6 | use crate::types::AtomicalsTx;
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
-  --> src/wallet/web/unisat.rs:53:39
+warning: variable does not need to be mutable
+  --> src/operations/mint_ft.rs:60:9
    |
-53 |     async fn get_public_key(&self) -> Result<String, Error> {
-   |                                       ^^^^^^       ------- help: remove the unnecessary generic argument
-   |                                       |
-   |                                       expected 1 generic argument
+60 |     let mut inputs = vec![TxIn::default()]; // Will be filled by wallet
+   |         ----^^^^^^
+   |         |
+   |         help: remove this `mut`
    |
-note: type alias defined here, with 1 generic parameter: `T`
-  --> src/errors/mod.rs:49:10
-   |
-49 | pub type Result<T> = std::result::Result<T, Error>;
-   |          ^^^^^^ -
+   = note: `#[warn(unused_mut)]` on by default
 
-error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
-  --> src/wallet/web/unisat.rs:63:36
+warning: variable does not need to be mutable
+  --> src/operations/mint_ft.rs:61:9
    |
-63 |     async fn get_address(&self) -> Result<String, Error> {
-   |                                    ^^^^^^       ------- help: remove the unnecessary generic argument
-   |                                    |
-   |                                    expected 1 generic argument
-   |
-note: type alias defined here, with 1 generic parameter: `T`
-  --> src/errors/mod.rs:49:10
-   |
-49 | pub type Result<T> = std::result::Result<T, Error>;
-   |          ^^^^^^ -
-
-error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
-  --> src/wallet/web/unisat.rs:73:82
-   |
-73 |     async fn sign_transaction(&self, tx: Transaction, input_txouts: &[TxOut]) -> Result<AtomicalsTx, Error> {
-   |                                                                                  ^^^^^^            ------- help: remove the unnecessary generic argument
-   |                                                                                  |
-   |                                                                                  expected 1 generic argument
-   |
-note: type alias defined here, with 1 generic parameter: `T`
-  --> src/errors/mod.rs:49:10
-   |
-49 | pub type Result<T> = std::result::Result<T, Error>;
-   |          ^^^^^^ -
-
-error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
-  --> src/wallet/web/unisat.rs:94:63
-   |
-94 |     async fn broadcast_transaction(&self, tx: AtomicalsTx) -> Result<String, Error> {
-   |                                                               ^^^^^^       ------- help: remove the unnecessary generic argument
-   |                                                               |
-   |                                                               expected 1 generic argument
-   |
-note: type alias defined here, with 1 generic parameter: `T`
-  --> src/errors/mod.rs:49:10
-   |
-49 | pub type Result<T> = std::result::Result<T, Error>;
-   |          ^^^^^^ -
-
-error[E0277]: the trait bound `[u8]: AsRef<bitcoin::script::PushBytes>` is not satisfied
-  --> src/operations/mint_ft.rs:44:38
-   |
-44 |         builder = builder.push_slice(chunk);
-   |                           ---------- ^^^^^ the trait `AsRef<bitcoin::script::PushBytes>` is not implemented for `[u8]`, which is required by `&[u8]: AsRef<bitcoin::script::PushBytes>`
-   |                           |
-   |                           required by a bound introduced by this call
-   |
-   = help: the following other types implement trait `AsRef<T>`:
-             `[T; N]` implements `AsRef<[T]>`
-             `[T]` implements `AsRef<[T]>`
-             `[u8; 0]` implements `AsRef<bitcoin::script::PushBytes>`
-             `[u8; 10]` implements `AsRef<bitcoin::script::PushBytes>`
-             `[u8; 11]` implements `AsRef<bitcoin::script::PushBytes>`
-             `[u8; 12]` implements `AsRef<bitcoin::script::PushBytes>`
-             `[u8; 13]` implements `AsRef<bitcoin::script::PushBytes>`
-             `[u8; 14]` implements `AsRef<bitcoin::script::PushBytes>`
-           and 68 others
-   = note: required for `&[u8]` to implement `AsRef<bitcoin::script::PushBytes>`
-note: required by a bound in `bitcoin::script::Builder::push_slice`
-  --> /home/ubuntu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitcoin-0.30.2/src/blockdata/script/builder.rs:63:26
-   |
-63 |     pub fn push_slice<T: AsRef<PushBytes>>(mut self, data: T) -> Builder {
-   |                          ^^^^^^^^^^^^^^^^ required by this bound in `Builder::push_slice`
-
-error[E0053]: method `sign_transaction` has an incompatible type for trait
-  --> src/wallet/web/unisat.rs:51:41
-   |
-51 | #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-   |                                         ^^^^^^^^^^^ expected `bitcoin::Transaction`, found `AtomicalsTx`
-   |
-note: type in trait
-  --> src/wallet/mod.rs:10:41
-   |
-10 | #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-   |                                         ^^^^^^^^^^^^^^^^^^^^^^^^
-   = note: expected signature `fn(&'life0 UnisatProvider, bitcoin::Transaction, &'life1 _) -> Pin<Box<(dyn std::future::Future<Output = std::result::Result<bitcoin::Transaction, errors::Error>> + Send + 'async_trait)>>`
-              found signature `fn(&'life0 UnisatProvider, bitcoin::Transaction, &'life1 _) -> Pin<Box<(dyn std::future::Future<Output = std::result::Result<AtomicalsTx, errors::Error>> + Send + 'async_trait)>>`
-   = note: this error originates in the attribute macro `async_trait` which comes from the expansion of the attribute macro `async_trait::async_trait` (in Nightly builds, run with -Z macro-backtrace for more info)
-help: change the output type to match the trait
-   |
-51 | #[cfg_attr(not(target_arch = "wasm32"), Pin<Box<(dyn std::future::Future<Output = std::result::Result<bitcoin::Transaction, errors::Error>> + Send + 'async_trait)>>)]
-   |                                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-error[E0053]: method `broadcast_transaction` has an incompatible type for trait
-  --> src/wallet/web/unisat.rs:94:47
-   |
-94 |     async fn broadcast_transaction(&self, tx: AtomicalsTx) -> Result<String, Error> {
-   |                                               ^^^^^^^^^^^ expected `bitcoin::Transaction`, found `AtomicalsTx`
-   |
-note: type in trait
-  --> src/wallet/mod.rs:15:47
-   |
-15 |     async fn broadcast_transaction(&self, tx: Transaction) -> Result<String>;
-   |                                               ^^^^^^^^^^^
-   = note: expected signature `fn(&'life0 UnisatProvider, bitcoin::Transaction) -> Pin<_>`
-              found signature `fn(&'life0 UnisatProvider, AtomicalsTx) -> Pin<_>`
-help: change the parameter type to match the trait
-   |
-94 |     async fn broadcast_transaction(&self, tx: bitcoin::Transaction) -> Result<String, Error> {
-   |                                               ~~~~~~~~~~~~~~~~~~~~
-
-error[E0107]: type alias takes 1 generic argument but 2 generic arguments were supplied
-  --> src/wallet/web/unisat.rs:42:29
-   |
-42 |     fn get_unisat(&self) -> Result<UniSat, Error> {
-   |                             ^^^^^^       ------- help: remove the unnecessary generic argument
-   |                             |
-   |                             expected 1 generic argument
-   |
-note: type alias defined here, with 1 generic parameter: `T`
-  --> src/errors/mod.rs:49:10
-   |
-49 | pub type Result<T> = std::result::Result<T, Error>;
-   |          ^^^^^^ -
-
-error[E0053]: method `sign_transaction` has an incompatible type for trait
-  --> src/wallet/web/wizz.rs:49:41
-   |
-49 | #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-   |                                         ^^^^^^^^^^^ expected `bitcoin::Transaction`, found `AtomicalsTx`
-   |
-note: type in trait
-  --> src/wallet/mod.rs:10:41
-   |
-10 | #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-   |                                         ^^^^^^^^^^^^^^^^^^^^^^^^
-   = note: expected signature `fn(&'life0 WizzProvider, bitcoin::Transaction, &'life1 _) -> Pin<Box<(dyn std::future::Future<Output = std::result::Result<bitcoin::Transaction, errors::Error>> + Send + 'async_trait)>>`
-              found signature `fn(&'life0 WizzProvider, bitcoin::Transaction, &'life1 _) -> Pin<Box<(dyn std::future::Future<Output = std::result::Result<AtomicalsTx, errors::Error>> + Send + 'async_trait)>>`
-   = note: this error originates in the attribute macro `async_trait` which comes from the expansion of the attribute macro `async_trait::async_trait` (in Nightly builds, run with -Z macro-backtrace for more info)
-help: change the output type to match the trait
-   |
-49 | #[cfg_attr(not(target_arch = "wasm32"), Pin<Box<(dyn std::future::Future<Output = std::result::Result<bitcoin::Transaction, errors::Error>> + Send + 'async_trait)>>)]
-   |                                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-error[E0053]: method `broadcast_transaction` has an incompatible type for trait
-  --> src/wallet/web/wizz.rs:84:47
-   |
-84 |     async fn broadcast_transaction(&self, tx: AtomicalsTx) -> Result<String> {
-   |                                               ^^^^^^^^^^^ expected `bitcoin::Transaction`, found `AtomicalsTx`
-   |
-note: type in trait
-  --> src/wallet/mod.rs:15:47
-   |
-15 |     async fn broadcast_transaction(&self, tx: Transaction) -> Result<String>;
-   |                                               ^^^^^^^^^^^
-   = note: expected signature `fn(&'life0 WizzProvider, bitcoin::Transaction) -> Pin<_>`
-              found signature `fn(&'life0 WizzProvider, AtomicalsTx) -> Pin<_>`
-help: change the parameter type to match the trait
-   |
-84 |     async fn broadcast_transaction(&self, tx: bitcoin::Transaction) -> Result<String> {
-   |                                               ~~~~~~~~~~~~~~~~~~~~
-
-error[E0308]: mismatched types
-   --> src/operations/mining.rs:108:42
-    |
-108 |                         input.sequence = nonce;
-    |                         --------------   ^^^^^ expected `Sequence`, found `u32`
-    |                         |
-    |                         expected due to the type of this binding
-    |
-help: try wrapping the expression in `bitcoin::Sequence`
-    |
-108 |                         input.sequence = bitcoin::Sequence(nonce);
-    |                                          ++++++++++++++++++     +
-
-error[E0308]: mismatched types
-   --> src/operations/mining.rs:165:20
-    |
-165 |         lock_time: 0,
-    |                    ^ expected `LockTime`, found integer
-
-error[E0599]: no function or associated item named `new_op_return` found for struct `bitcoin::Script` in the current scope
-   --> src/operations/mining.rs:172:39
-    |
-172 |         let script = bitcoin::Script::new_op_return(&data);
-    |                                       ^^^^^^^^^^^^^ function or associated item not found in `Script`
-    |
-help: there is a method `is_op_return` with a similar name, but with different arguments
-   --> /home/ubuntu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitcoin-0.30.2/src/blockdata/script/borrowed.rs:297:5
-    |
-297 |     pub fn is_op_return (&self) -> bool {
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error[E0277]: `?` couldn't convert the error to `errors::Error`
-  --> src/wallet/web/unisat.rs:80:65
-   |
-80 |         let inputs = serde_wasm_bindgen::to_value(&input_txouts)?;
-   |                                                                 ^ the trait `From<serde_wasm_bindgen::Error>` is not implemented for `errors::Error`, which is required by `std::result::Result<AtomicalsTx, errors::Error>: FromResidual<std::result::Result<Infallible, serde_wasm_bindgen::Error>>`
-   |
-   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
-   = help: the following other types implement trait `From<T>`:
-             `errors::Error` implements `From<Box<(dyn StdError + Send + Sync + 'static)>>`
-             `errors::Error` implements `From<bitcoin::Error>`
-             `errors::Error` implements `From<serde_json::Error>`
-             `errors::Error` implements `From<std::io::Error>`
-   = note: required for `std::result::Result<AtomicalsTx, errors::Error>` to implement `FromResidual<std::result::Result<Infallible, serde_wasm_bindgen::Error>>`
-
-error[E0277]: `?` couldn't convert the error to `errors::Error`
-  --> src/wallet/web/unisat.rs:89:106
-   |
-89 |         let signed_tx: Transaction = bitcoin::consensus::encode::deserialize(&hex::decode(&signed_tx_hex)?)?;
-   |                                                                                                          ^ the trait `From<hex::FromHexError>` is not implemented for `errors::Error`, which is required by `std::result::Result<AtomicalsTx, errors::Error>: FromResidual<std::result::Result<Infallible, hex::FromHexError>>`
-   |
-   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
-   = help: the following other types implement trait `From<T>`:
-             `errors::Error` implements `From<Box<(dyn StdError + Send + Sync + 'static)>>`
-             `errors::Error` implements `From<bitcoin::Error>`
-             `errors::Error` implements `From<serde_json::Error>`
-             `errors::Error` implements `From<std::io::Error>`
-   = note: required for `std::result::Result<AtomicalsTx, errors::Error>` to implement `FromResidual<std::result::Result<Infallible, hex::FromHexError>>`
-
-error[E0277]: `?` couldn't convert the error to `errors::Error`
-  --> src/wallet/web/unisat.rs:89:108
-   |
-89 |         let signed_tx: Transaction = bitcoin::consensus::encode::deserialize(&hex::decode(&signed_tx_hex)?)?;
-   |                                                                                                            ^ the trait `From<bitcoin::consensus::encode::Error>` is not implemented for `errors::Error`, which is required by `std::result::Result<AtomicalsTx, errors::Error>: FromResidual<std::result::Result<Infallible, bitcoin::consensus::encode::Error>>`
-   |
-   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
-   = help: the following other types implement trait `From<T>`:
-             `errors::Error` implements `From<Box<(dyn StdError + Send + Sync + 'static)>>`
-             `errors::Error` implements `From<bitcoin::Error>`
-             `errors::Error` implements `From<serde_json::Error>`
-             `errors::Error` implements `From<std::io::Error>`
-   = note: required for `std::result::Result<AtomicalsTx, errors::Error>` to implement `FromResidual<std::result::Result<Infallible, bitcoin::consensus::encode::Error>>`
-
-error: future cannot be sent between threads safely
-  --> src/wallet/web/wizz.rs:51:54
-   |
-51 |       async fn get_public_key(&self) -> Result<String> {
-   |  ______________________________________________________^
-52 | |         let wizz = self.get_wizz()?;
-53 | |         let promise = wizz.get_public_key();
-54 | |         let result = JsFuture::from(promise).await
-...  |
-58 | |         Ok(public_key)
-59 | |     }
-   | |_____^ future created by async block is not `Send`
-   |
-   = help: within `WizzProvider`, the trait `Sync` is not implemented for `*mut u8`, which is required by `{async block@src/wallet/web/wizz.rs:51:54: 59:6}: Send`
-note: captured value is not `Send` because `&` references cannot be sent unless their referent is `Sync`
-  --> src/wallet/web/wizz.rs:51:30
-   |
-51 |     async fn get_public_key(&self) -> Result<String> {
-   |                              ^^^^ has type `&WizzProvider` which is not `Send`, because `WizzProvider` is not `Sync`
-   = note: required for the cast from `Pin<Box<{async block@src/wallet/web/wizz.rs:51:54: 59:6}>>` to `Pin<Box<(dyn std::future::Future<Output = std::result::Result<std::string::String, errors::Error>> + Send + 'async_trait)>>`
-
-error: future cannot be sent between threads safely
-  --> src/wallet/web/wizz.rs:61:51
-   |
-61 |       async fn get_address(&self) -> Result<String> {
-   |  ___________________________________________________^
-62 | |         let wizz = self.get_wizz()?;
-63 | |         let promise = wizz.get_address();
-64 | |         let result = JsFuture::from(promise).await
-...  |
-68 | |         Ok(address)
-69 | |     }
-   | |_____^ future created by async block is not `Send`
-   |
-   = help: within `WizzProvider`, the trait `Sync` is not implemented for `*mut u8`, which is required by `{async block@src/wallet/web/wizz.rs:61:51: 69:6}: Send`
-note: captured value is not `Send` because `&` references cannot be sent unless their referent is `Sync`
-  --> src/wallet/web/wizz.rs:61:27
-   |
-61 |     async fn get_address(&self) -> Result<String> {
-   |                           ^^^^ has type `&WizzProvider` which is not `Send`, because `WizzProvider` is not `Sync`
-   = note: required for the cast from `Pin<Box<{async block@src/wallet/web/wizz.rs:61:51: 69:6}>>` to `Pin<Box<(dyn std::future::Future<Output = std::result::Result<std::string::String, errors::Error>> + Send + 'async_trait)>>`
-
-error[E0277]: `?` couldn't convert the error to `errors::Error`
-  --> src/wallet/web/wizz.rs:74:65
-   |
-74 |         let inputs = serde_wasm_bindgen::to_value(&input_txouts)?;
-   |                                                                 ^ the trait `From<serde_wasm_bindgen::Error>` is not implemented for `errors::Error`, which is required by `std::result::Result<AtomicalsTx, errors::Error>: FromResidual<std::result::Result<Infallible, serde_wasm_bindgen::Error>>`
-   |
-   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
-   = help: the following other types implement trait `From<T>`:
-             `errors::Error` implements `From<Box<(dyn StdError + Send + Sync + 'static)>>`
-             `errors::Error` implements `From<bitcoin::Error>`
-             `errors::Error` implements `From<serde_json::Error>`
-             `errors::Error` implements `From<std::io::Error>`
-   = note: required for `std::result::Result<AtomicalsTx, errors::Error>` to implement `FromResidual<std::result::Result<Infallible, serde_wasm_bindgen::Error>>`
-
-error[E0277]: `?` couldn't convert the error to `errors::Error`
-  --> src/wallet/web/wizz.rs:80:106
-   |
-80 |         let signed_tx: Transaction = bitcoin::consensus::encode::deserialize(&hex::decode(&signed_tx_hex)?)?;
-   |                                                                                                          ^ the trait `From<hex::FromHexError>` is not implemented for `errors::Error`, which is required by `std::result::Result<AtomicalsTx, errors::Error>: FromResidual<std::result::Result<Infallible, hex::FromHexError>>`
-   |
-   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
-   = help: the following other types implement trait `From<T>`:
-             `errors::Error` implements `From<Box<(dyn StdError + Send + Sync + 'static)>>`
-             `errors::Error` implements `From<bitcoin::Error>`
-             `errors::Error` implements `From<serde_json::Error>`
-             `errors::Error` implements `From<std::io::Error>`
-   = note: required for `std::result::Result<AtomicalsTx, errors::Error>` to implement `FromResidual<std::result::Result<Infallible, hex::FromHexError>>`
-
-error[E0277]: `?` couldn't convert the error to `errors::Error`
-  --> src/wallet/web/wizz.rs:80:108
-   |
-80 |         let signed_tx: Transaction = bitcoin::consensus::encode::deserialize(&hex::decode(&signed_tx_hex)?)?;
-   |                                                                                                            ^ the trait `From<bitcoin::consensus::encode::Error>` is not implemented for `errors::Error`, which is required by `std::result::Result<AtomicalsTx, errors::Error>: FromResidual<std::result::Result<Infallible, bitcoin::consensus::encode::Error>>`
-   |
-   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
-   = help: the following other types implement trait `From<T>`:
-             `errors::Error` implements `From<Box<(dyn StdError + Send + Sync + 'static)>>`
-             `errors::Error` implements `From<bitcoin::Error>`
-             `errors::Error` implements `From<serde_json::Error>`
-             `errors::Error` implements `From<std::io::Error>`
-   = note: required for `std::result::Result<AtomicalsTx, errors::Error>` to implement `FromResidual<std::result::Result<Infallible, bitcoin::consensus::encode::Error>>`
-
-error: future cannot be sent between threads safely
-  --> src/wallet/web/wizz.rs:84:78
-   |
-84 |       async fn broadcast_transaction(&self, tx: AtomicalsTx) -> Result<String> {
-   |  ______________________________________________________________________________^
-85 | |         let wizz = self.get_wizz()?;
-86 | |         let tx_hex = bitcoin::consensus::encode::serialize_hex(&tx.raw_tx);
-87 | |         let promise = wizz.broadcast_transaction(&tx_hex);
-...  |
-92 | |         Ok(txid)
-93 | |     }
-   | |_____^ future created by async block is not `Send`
-   |
-   = help: within `WizzProvider`, the trait `Sync` is not implemented for `*mut u8`, which is required by `{async block@src/wallet/web/wizz.rs:84:78: 93:6}: Send`
-note: captured value is not `Send` because `&` references cannot be sent unless their referent is `Sync`
-  --> src/wallet/web/wizz.rs:84:37
-   |
-84 |     async fn broadcast_transaction(&self, tx: AtomicalsTx) -> Result<String> {
-   |                                     ^^^^ has type `&WizzProvider` which is not `Send`, because `WizzProvider` is not `Sync`
-   = note: required for the cast from `Pin<Box<{async block@src/wallet/web/wizz.rs:84:78: 93:6}>>` to `Pin<Box<(dyn std::future::Future<Output = std::result::Result<std::string::String, errors::Error>> + Send + 'async_trait)>>`
+61 |     let mut outputs = vec![
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
 
 warning: unused import: `rayon::prelude`
  --> src/operations/mining.rs:6:5
@@ -396,24 +79,35 @@ warning: unused import: `rayon::prelude`
 6 | use rayon::prelude::*;
   |     ^^^^^^^^^^^^^^
 
-error[E0382]: borrow of moved value: `prefix`
-  --> src/types/mint.rs:31:25
+warning: variable does not need to be mutable
+  --> src/operations/mining.rs:44:5
    |
-27 |     pub fn new(prefix: String) -> Self {
-   |                ------ move occurs because `prefix` has type `std::string::String`, which does not implement the `Copy` trait
-28 |         Self {
-29 |             prefix,
-   |             ------ value moved here
-30 |             ext: None,
-31 |             difficulty: prefix.len() as u32 * 4, // Each hex char is 4 bits
-   |                         ^^^^^^ value borrowed here after move
-   |
-help: consider cloning the value if the performance cost is acceptable
-   |
-29 |             prefix: prefix.clone(),
-   |                   ++++++++++++++++
+44 |     mut tx: Transaction,
+   |     ----^^
+   |     |
+   |     help: remove this `mut`
 
-Some errors have detailed explanations: E0053, E0107, E0277, E0308, E0382, E0599.
-For more information about an error, try `rustc --explain E0053`.
-warning: `atomicals-rs` (lib) generated 8 warnings
-error: could not compile `atomicals-rs` (lib) due to 23 previous errors; 8 warnings emitted
+warning: unused variable: `input_txouts`
+   --> src/wallet/web/unisat.rs:133:55
+    |
+133 |     async fn sign_transaction(&self, tx: Transaction, input_txouts: &[TxOut]) -> Result<Transaction> {
+    |                                                       ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_input_txouts`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: methods `sign_transaction` and `broadcast_transaction` are never used
+  --> src/wallet/web/unisat.rs:79:14
+   |
+38 | impl UnisatProvider {
+   | ------------------- methods in this implementation
+...
+79 |     async fn sign_transaction(&self, tx: Transaction, _utxos: &[TxOut]) -> Result<Transaction> {
+   |              ^^^^^^^^^^^^^^^^
+...
+92 |     async fn broadcast_transaction(&self, tx: Transaction) -> Result<String> {
+   |              ^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: `atomicals-rs` (lib) generated 15 warnings (run `cargo fix --lib -p atomicals-rs` to apply 12 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.48s

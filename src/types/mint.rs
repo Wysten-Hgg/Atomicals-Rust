@@ -25,10 +25,11 @@ pub struct BitworkInfo {
 
 impl BitworkInfo {
     pub fn new(prefix: String) -> Self {
+        let difficulty = prefix.len() as u32 * 4; // Calculate difficulty before moving prefix
         Self {
-            prefix,
+            prefix: prefix.clone(), // Clone prefix before moving it
             ext: None,
-            difficulty: prefix.len() as u32 * 4, // Each hex char is 4 bits
+            difficulty,
         }
     }
 

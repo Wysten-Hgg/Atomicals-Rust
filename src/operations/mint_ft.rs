@@ -36,27 +36,40 @@ pub async fn mint_ft<W: WalletProvider>(
     let payload = serde_json::to_vec(&mint_data).map_err(|e| Error::from(e))?;
     
     // Create OP_RETURN script
-    let mut builder = ScriptBuf::builder();
+    let mut builder = bitcoin::script::Builder::new();
     builder = builder.push_opcode(OP_RETURN);
     
     // Split payload into chunks that fit within push limits
-    for chunk in payload.chunks(75) {
-        builder = builder.push_slice(chunk);
+    for chunk in payload.chunks(32) {
+        if chunk.len() <= 32 {
+            let mut array = [0u8; 32];
+            array[..chunk.len()].copy_from_slice(chunk);
+            builder = builder.push_opcode(bitcoin::opcodes::all::OP_PUSHBYTES_32)
+                .push_slice(&array);
+        } else {
+            return Err(Error::Generic(Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Script chunk too large"
+            ))));
+        }
     }
     
     let script = builder.into_script();
     
     // Create transaction template
+    let mut inputs = vec![TxIn::default()]; // Will be filled by wallet
+    let mut outputs = vec![
+        TxOut {
+            value: 0,
+            script_pubkey: script,
+        }
+    ];
+
     let mut tx = Transaction {
         version: 2,
         lock_time: LockTime::ZERO,
-        input: vec![TxIn::default()], // Will be filled by wallet
-        output: vec![
-            TxOut {
-                value: 0,
-                script_pubkey: script,
-            }
-        ],
+        input: inputs,
+        output: outputs,
     };
 
     // If mining is required
@@ -69,13 +82,15 @@ pub async fn mint_ft<W: WalletProvider>(
         tx = mining_result.transaction;
     }
 
-    // Sign and broadcast transaction
-    let signed_tx = wallet.sign_transaction(tx, &[]).await.map_err(|e| Error::WalletError(e.to_string()))?;
-    let txid = wallet.broadcast_transaction(signed_tx).await.map_err(|e| Error::WalletError(e.to_string()))?;
+    // Sign the transaction
+    let signed_tx = wallet.sign_transaction(tx.clone(), &[]).await.map_err(|e| Error::WalletError(e.to_string()))?;
+
+    // Get the transaction ID
+    let txid = signed_tx.txid().to_string();
 
     // Create token instance
     let mut token = Arc20Token::new(config);
     token.add_holder(address, token.config.mint_amount)?;
 
-    Ok(AtomicalsTx::new(tx, vec![]).with_atomicals_id(txid))
+    Ok(AtomicalsTx::new(signed_tx, vec![]).with_atomicals_id(txid))
 }

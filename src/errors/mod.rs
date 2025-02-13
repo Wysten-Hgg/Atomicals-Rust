@@ -53,3 +53,15 @@ impl From<Box<dyn StdError + Send + Sync>> for Error {
         Error::Generic(err)
     }
 }
+
+impl From<hex::FromHexError> for Error {
+    fn from(e: hex::FromHexError) -> Self {
+        Error::Generic(Box::new(e))
+    }
+}
+
+impl From<bitcoin::consensus::encode::Error> for Error {
+    fn from(e: bitcoin::consensus::encode::Error) -> Self {
+        Error::Generic(Box::new(e))
+    }
+}

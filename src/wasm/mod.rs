@@ -46,12 +46,12 @@ impl AtomicalsWasm {
         let result = match self.wallet_type.as_str() {
             "unisat" => {
                 let wallet = UnisatProvider::new()
-                    .ok_or_else(|| JsValue::from_str("Failed to initialize UniSat wallet"))?;
+                    .map_err(|e| JsValue::from_str(&format!("Failed to initialize UniSat wallet: {}", e)))?;
                 mint_ft(&wallet, config, None).await
             }
             "wizz" => {
                 let wallet = WizzProvider::new()
-                    .ok_or_else(|| JsValue::from_str("Failed to initialize Wizz wallet"))?;
+                    .map_err(|e| JsValue::from_str(&format!("Failed to initialize Wizz wallet: {}", e)))?;
                 mint_ft(&wallet, config, None).await
             }
             _ => return Err(JsValue::from_str("Unsupported wallet type")),
