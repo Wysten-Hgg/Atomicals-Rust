@@ -29,6 +29,9 @@ pub enum Error {
     
     #[error("Mining error: {0}")]
     MiningError(String),
+
+    #[error("Insufficient funds")]
+    InsufficientFunds,
     
     #[error("Bitcoin error: {0}")]
     BitcoinError(#[from] bitcoin::Error),

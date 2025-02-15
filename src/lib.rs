@@ -3,7 +3,7 @@ pub mod errors;
 // pub mod interfaces;
 pub mod operations;
 pub mod types;
-// pub mod utils;
+pub mod utils;
 pub mod wallet;
 pub mod wasm;
 
@@ -17,3 +17,9 @@ pub use crate::wallet::{
     WalletProvider,
     web::{UnisatProvider, WizzProvider}
 };
+
+pub use errors::{Error, Result};
+pub use types::*;
+pub use operations::*;
+pub use utils::*;
+pub use wallet::*;

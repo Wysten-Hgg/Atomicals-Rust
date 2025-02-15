@@ -24,6 +24,9 @@ extern "C" {
 
     #[wasm_bindgen(method, js_name = "sendTransaction")]
     fn send_transaction(this: &UniSat, tx: &str) -> js_sys::Promise;
+
+    #[wasm_bindgen(method, js_name = "getNetwork")]
+    fn get_network(this: &UniSat) -> js_sys::Promise;
 }
 
 #[derive(Clone)]
@@ -50,108 +53,88 @@ impl UnisatProvider {
 
     pub async fn get_public_key(&self) -> Result<String> {
         let unisat = self.get_unisat()?;
-        let accounts = JsFuture::from(unisat.get_accounts()).await
+        let accounts = JsFuture::from(unisat.get_accounts())
+            .await
             .map_err(|e| Error::WasmError(format!("Failed to get accounts: {:?}", e)))?;
-        let accounts_array = js_sys::Array::from(&accounts);
-        if accounts_array.length() == 0 {
-            return Err(Error::WalletError("No accounts found".to_string()));
-        }
-        let address = accounts_array.get(0)
-            .as_string()
-            .ok_or_else(|| Error::WalletError("Invalid address format".to_string()))?;
-        Ok(address)
+        let accounts: Vec<String> = serde_wasm_bindgen::from_value(accounts)
+            .map_err(|e| Error::WasmError(format!("Failed to parse accounts: {:?}", e)))?;
+        accounts.first()
+            .cloned()
+            .ok_or_else(|| Error::WasmError("No accounts found".to_string()))
     }
 
     pub async fn get_address(&self) -> Result<String> {
         let unisat = self.get_unisat()?;
-        let accounts = JsFuture::from(unisat.get_accounts()).await
+        let accounts = JsFuture::from(unisat.get_accounts())
+            .await
             .map_err(|e| Error::WasmError(format!("Failed to get accounts: {:?}", e)))?;
-        let accounts_array = js_sys::Array::from(&accounts);
-        if accounts_array.length() == 0 {
-            return Err(Error::WalletError("No accounts found".to_string()));
-        }
-        let address = accounts_array.get(0)
-            .as_string()
-            .ok_or_else(|| Error::WalletError("Invalid address format".to_string()))?;
-        Ok(address)
+        let accounts: Vec<String> = serde_wasm_bindgen::from_value(accounts)
+            .map_err(|e| Error::WasmError(format!("Failed to parse accounts: {:?}", e)))?;
+        accounts.first()
+            .cloned()
+            .ok_or_else(|| Error::WasmError("No accounts found".to_string()))
     }
 
-    async fn sign_transaction(&self, tx: Transaction, _utxos: &[TxOut]) -> Result<Transaction> {
+    pub async fn get_network(&self) -> Result<String> {
         let unisat = self.get_unisat()?;
-        let tx_hex = bitcoin::consensus::encode::serialize_hex(&tx);
-        let result = JsFuture::from(unisat.sign_transaction(&tx_hex)).await
-            .map_err(|e| Error::WalletError(format!("Failed to sign transaction: {:?}", e)))?;
-        
-        let signed_tx_hex = result.as_string()
-            .ok_or_else(|| Error::WalletError("Invalid signed transaction".to_string()))?;
-        let signed_tx: Transaction = bitcoin::consensus::encode::deserialize(&hex::decode(&signed_tx_hex)?)?;
-        
-        Ok(signed_tx)
+        let network = JsFuture::from(unisat.get_network())
+            .await
+            .map_err(|e| Error::WasmError(format!("Failed to get network: {:?}", e)))?;
+        let network: String = serde_wasm_bindgen::from_value(network)
+            .map_err(|e| Error::WasmError(format!("Failed to parse network: {:?}", e)))?;
+        Ok(network)
     }
 
-    async fn broadcast_transaction(&self, tx: Transaction) -> Result<String> {
+    pub async fn sign_transaction(&self, tx: Transaction, _utxos: &[TxOut]) -> Result<Transaction> {
         let unisat = self.get_unisat()?;
-        let tx_hex = bitcoin::consensus::encode::serialize_hex(&tx);
-        let result = JsFuture::from(unisat.send_transaction(&tx_hex)).await
-            .map_err(|e| Error::WalletError(format!("Failed to broadcast transaction: {:?}", e)))?;
-        let txid = result.as_string()
-            .ok_or_else(|| Error::WalletError("Invalid transaction ID".to_string()))?;
-        Ok(txid)
+        let tx_hex = hex::encode(bitcoin::consensus::serialize(&tx));
+        
+        let signed_tx = JsFuture::from(unisat.sign_transaction(&tx_hex))
+            .await
+            .map_err(|e| Error::WasmError(format!("Failed to sign transaction: {:?}", e)))?;
+        
+        let signed_tx_hex: String = serde_wasm_bindgen::from_value(signed_tx)
+            .map_err(|e| Error::WasmError(format!("Failed to parse signed transaction: {:?}", e)))?;
+        
+        let signed_tx_bytes = hex::decode(signed_tx_hex)
+            .map_err(|e| Error::WasmError(format!("Failed to decode signed transaction: {:?}", e)))?;
+        
+        bitcoin::consensus::deserialize(&signed_tx_bytes)
+            .map_err(|e| Error::WasmError(format!("Failed to deserialize signed transaction: {:?}", e)))
+    }
+
+    pub async fn broadcast_transaction(&self, tx: Transaction) -> Result<String> {
+        let unisat = self.get_unisat()?;
+        let tx_hex = hex::encode(bitcoin::consensus::serialize(&tx));
+        
+        let txid = JsFuture::from(unisat.send_transaction(&tx_hex))
+            .await
+            .map_err(|e| Error::WasmError(format!("Failed to broadcast transaction: {:?}", e)))?;
+        
+        serde_wasm_bindgen::from_value(txid)
+            .map_err(|e| Error::WasmError(format!("Failed to parse txid: {:?}", e)))
     }
 }
 
 #[async_trait(?Send)]
 impl WalletProvider for UnisatProvider {
     async fn get_public_key(&self) -> Result<String> {
-        let unisat = self.get_unisat()?;
-        let accounts = JsFuture::from(unisat.get_accounts()).await
-            .map_err(|e| Error::WasmError(format!("Failed to get accounts: {:?}", e)))?;
-        let accounts_array = js_sys::Array::from(&accounts);
-        if accounts_array.length() == 0 {
-            return Err(Error::WalletError("No accounts found".to_string()));
-        }
-        let address = accounts_array.get(0)
-            .as_string()
-            .ok_or_else(|| Error::WalletError("Invalid address format".to_string()))?;
-        Ok(address)
+        self.get_public_key().await
     }
 
     async fn get_address(&self) -> Result<String> {
-        let unisat = self.get_unisat()?;
-        let accounts = JsFuture::from(unisat.get_accounts()).await
-            .map_err(|e| Error::WasmError(format!("Failed to get accounts: {:?}", e)))?;
-        let accounts_array = js_sys::Array::from(&accounts);
-        if accounts_array.length() == 0 {
-            return Err(Error::WalletError("No accounts found".to_string()));
-        }
-        let address = accounts_array.get(0)
-            .as_string()
-            .ok_or_else(|| Error::WalletError("Invalid address format".to_string()))?;
-        Ok(address)
+        self.get_address().await
+    }
+
+    async fn get_network(&self) -> Result<String> {
+        self.get_network().await
     }
 
     async fn sign_transaction(&self, tx: Transaction, input_txouts: &[TxOut]) -> Result<Transaction> {
-        let unisat = self.get_unisat()?;
-        let tx_hex = bitcoin::consensus::encode::serialize_hex(&tx);
-        let result = JsFuture::from(unisat.sign_transaction(&tx_hex)).await
-            .map_err(|e| Error::WasmError(format!("Failed to sign transaction: {:?}", e)))?;
-        let signed_tx_hex = result.as_string()
-            .ok_or_else(|| Error::WalletError("Invalid signed transaction format".to_string()))?;
-        
-        let signed_tx_bytes = hex::decode(&signed_tx_hex)
-            .map_err(|e| Error::Generic(Box::new(e)))?;
-        let signed_tx = bitcoin::consensus::encode::deserialize(&signed_tx_bytes)
-            .map_err(|e| Error::Generic(Box::new(e)))?;
-        Ok(signed_tx)
+        self.sign_transaction(tx, input_txouts).await
     }
 
     async fn broadcast_transaction(&self, tx: Transaction) -> Result<String> {
-        let unisat = self.get_unisat()?;
-        let tx_hex = bitcoin::consensus::encode::serialize_hex(&tx);
-        let result = JsFuture::from(unisat.send_transaction(&tx_hex)).await
-            .map_err(|e| Error::WasmError(format!("Failed to broadcast transaction: {:?}", e)))?;
-        let txid = result.as_string()
-            .ok_or_else(|| Error::WalletError("Invalid transaction ID format".to_string()))?;
-        Ok(txid)
+        self.broadcast_transaction(tx).await
     }
 }
