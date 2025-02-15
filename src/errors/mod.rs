@@ -1,70 +1,100 @@
+use std::fmt;
 use std::error::Error as StdError;
-use thiserror::Error;
+use bitcoin::consensus;
+use wasm_bindgen::JsValue;
+use serde_wasm_bindgen;
+use serde_json;
 
-#[derive(Debug, Error)]
+#[derive(Debug)]
 pub enum Error {
-    #[error("Invalid amount: {0}")]
-    InvalidAmount(String),
-    
-    #[error("Invalid ticker: {0}")]
-    InvalidTicker(String),
-    
-    #[error("Invalid bitwork: {0}")]
-    InvalidBitwork(String),
-    
-    #[error("Wallet not found: {0}")]
-    WalletNotFound(String),
-    
-    #[error("Signing error: {0}")]
-    SigningError(String),
-    
-    #[error("Broadcast error: {0}")]
-    BroadcastError(String),
-    
-    #[error("Wallet error: {0}")]
-    WalletError(String),
-    
-    #[error("Mining timeout: {0}")]
-    MiningTimeout(String),
-    
-    #[error("Mining error: {0}")]
+    NetworkError(String),
+    AddressError(String),
+    TransactionError(String),
+    PsbtError(String),
     MiningError(String),
-
-    #[error("Insufficient funds")]
-    InsufficientFunds,
-    
-    #[error("Bitcoin error: {0}")]
-    BitcoinError(#[from] bitcoin::Error),
-    
-    #[error("WASM error: {0}")]
+    WalletError(String),
+    SerializationError(String),
+    DeserializationError(String),
+    WorkerError(String),
+    InvalidAmount(String),
+    InvalidTicker(String),
+    InvalidBitwork(String),
     WasmError(String),
-    
-    #[error("Serialization error: {0}")]
-    SerdeError(#[from] serde_json::Error),
-    
-    #[error("IO error: {0}")]
-    IoError(#[from] std::io::Error),
-    
-    #[error("Generic error: {0}")]
-    Generic(Box<dyn StdError + Send + Sync>),
+    IoError(std::io::Error),
+    SerdeError(serde_wasm_bindgen::Error),
+    HexError(String),
+    SerdeJsonError(serde_json::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-impl From<Box<dyn StdError + Send + Sync>> for Error {
-    fn from(err: Box<dyn StdError + Send + Sync>) -> Self {
-        Error::Generic(err)
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Error::NetworkError(msg) => write!(f, "Network error: {}", msg),
+            Error::AddressError(msg) => write!(f, "Address error: {}", msg),
+            Error::TransactionError(msg) => write!(f, "Transaction error: {}", msg),
+            Error::PsbtError(msg) => write!(f, "PSBT error: {}", msg),
+            Error::MiningError(msg) => write!(f, "Mining error: {}", msg),
+            Error::WalletError(msg) => write!(f, "Wallet error: {}", msg),
+            Error::SerializationError(msg) => write!(f, "Serialization error: {}", msg),
+            Error::DeserializationError(msg) => write!(f, "Deserialization error: {}", msg),
+            Error::WorkerError(msg) => write!(f, "Worker error: {}", msg),
+            Error::InvalidAmount(msg) => write!(f, "Invalid amount: {}", msg),
+            Error::InvalidTicker(msg) => write!(f, "Invalid ticker: {}", msg),
+            Error::InvalidBitwork(msg) => write!(f, "Invalid bitwork: {}", msg),
+            Error::WasmError(msg) => write!(f, "WASM error: {}", msg),
+            Error::IoError(e) => write!(f, "IO error: {}", e),
+            Error::SerdeError(e) => write!(f, "Serde error: {}", e),
+            Error::HexError(e) => write!(f, "Hex error: {}", e),
+            Error::SerdeJsonError(e) => write!(f, "JSON error: {}", e),
+        }
+    }
+}
+
+impl StdError for Error {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        match self {
+            Error::IoError(e) => Some(e),
+            Error::SerdeError(e) => Some(e),
+            Error::SerdeJsonError(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+impl From<consensus::encode::Error> for Error {
+    fn from(e: consensus::encode::Error) -> Self {
+        Error::SerializationError(e.to_string())
     }
 }
 
 impl From<hex::FromHexError> for Error {
     fn from(e: hex::FromHexError) -> Self {
-        Error::Generic(Box::new(e))
+        Error::HexError(e.to_string())
     }
 }
 
-impl From<bitcoin::consensus::encode::Error> for Error {
-    fn from(e: bitcoin::consensus::encode::Error) -> Self {
-        Error::Generic(Box::new(e))
+impl From<serde_wasm_bindgen::Error> for Error {
+    fn from(e: serde_wasm_bindgen::Error) -> Self {
+        Error::SerdeError(e)
+    }
+}
+
+impl From<serde_json::Error> for Error {
+    fn from(e: serde_json::Error) -> Self {
+        Error::SerdeJsonError(e)
+    }
+}
+
+impl From<JsValue> for Error {
+    fn from(value: JsValue) -> Self {
+        Error::WasmError(value.as_string().unwrap_or_else(|| "Unknown JS error".to_string()))
+    }
+}
+
+impl From<Error> for JsValue {
+    fn from(error: Error) -> Self {
+        JsValue::from_str(&error.to_string())
     }
 }

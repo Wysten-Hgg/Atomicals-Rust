@@ -1,79 +1,141 @@
-use std::str::FromStr;
-use crate::errors::{Error, Result};
 use crate::operations::mining::{mine_transaction, MiningOptions};
-use crate::types::{Arc20Config, AtomicalsTx, mint::BitworkInfo, AtomicalsPayload};
-use crate::utils::script_builder::build_atomicals_op_return;
+use crate::types::{AtomicalsTx, Arc20Config, mint::BitworkInfo};
+use crate::errors::{Error, Result};
 use crate::wallet::WalletProvider;
-use bitcoin::{Transaction, TxIn, TxOut, ScriptBuf, Network};
-use bitcoin::address::{NetworkUnchecked, Address};
-use bitcoin::locktime::absolute::LockTime;
-use web_sys::console;
+use bitcoin::{Amount, Network, Transaction, TxIn, TxOut, Txid};
+use bitcoin::transaction::Version;
+use bitcoin::address::Address;
+use bitcoin::psbt::Psbt;
+use std::str::FromStr;
+
+#[cfg(target_arch = "wasm32")]
+macro_rules! log {
+    ($($t:tt)*) => (web_sys::console::log_1(&format!($($t)*).into()))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+macro_rules! log {
+    ($($t:tt)*) => (log::info!($($t)*))
+}
 
 pub async fn mint_ft<W: WalletProvider>(
     wallet: &W,
     config: Arc20Config,
     mining_options: Option<MiningOptions>,
 ) -> Result<AtomicalsTx> {
-    console::log_1(&"Starting mint_ft operation...".into());
+    log!("Starting mint_ft operation...");
 
     // Get wallet address
-    console::log_1(&"Getting wallet address...".into());
-    let address_str = wallet.get_address().await.map_err(|e| Error::WalletError(e.to_string()))?;
-    let unchecked_address = Address::<NetworkUnchecked>::from_str(&address_str)
-        .map_err(|e| Error::WalletError(format!("Invalid address format: {}", e)))?;
-    
-    // 默认使用比特币主网，因为我们不再进行网络验证
-    let address = unchecked_address.require_network(Network::Testnet)
-        .map_err(|e| Error::WalletError(format!("Invalid network: {}", e)))?;
-    
-    console::log_1(&format!("Got wallet address: {:?}", address).into());
-    
-    // Create Atomicals payload for minting existing FT
-    let payload = AtomicalsPayload::new_mint_ft(config.tick.clone());
-    
-    // Create OP_RETURN output
-    let op_return_script = build_atomicals_op_return(&payload)?;
-    
-    // Get public key for deriving script_pubkey
-    let _public_key = wallet.get_public_key().await.map_err(|e| Error::WalletError(e.to_string()))?;
-    
-    // Create transaction outputs
-    let outputs = vec![
-        // OP_RETURN output
-        TxOut {
-            value: 0,
-            script_pubkey: op_return_script,
-        },
-        // Mint amount output to recipient
-        TxOut {
-            value: config.mint_amount.0,
-            script_pubkey: address.script_pubkey(),
-        }
-    ];
+    let address_str = wallet.get_address().await?;
+    let address = Address::from_str(&address_str)
+        .map_err(|e| Error::AddressError(e.to_string()))?
+        .require_network(Network::Bitcoin)
+        .map_err(|e| Error::NetworkError(e.to_string()))?;
 
-    // Create unsigned transaction
-    let mut tx = Transaction {
-        version: 2,
-        lock_time: LockTime::ZERO,
-        input: vec![], // Empty inputs, wallet will handle input selection
-        output: outputs.clone(),
+    // Create commit transaction
+    let commit_tx = Transaction {
+        version: Version(2),
+        lock_time: bitcoin::absolute::LockTime::ZERO,
+        input: vec![],
+        output: vec![
+            TxOut {
+                value: Amount::from_sat(0),
+                script_pubkey: address.script_pubkey(),
+            },
+            TxOut {
+                value: Amount::from_sat(config.mint_amount.0),
+                script_pubkey: address.script_pubkey(),
+            },
+        ],
     };
 
-    // Sign transaction (wallet handles input selection)
-    tx = wallet.sign_transaction(tx, &outputs).await.map_err(|e| Error::WalletError(e.to_string()))?;
+    let mut commit_psbt = Psbt::from_unsigned_tx(commit_tx)
+        .map_err(|e| Error::PsbtError(format!("Failed to create commit PSBT: {}", e)))?;
+    log!("Created commit PSBT");
 
-    // Mine transaction if required
-    if let Some(mining_opts) = mining_options {
-        // Create bitwork info from mining options
-        let bitwork = BitworkInfo {
-            prefix: "0000".to_string(),
-            ext: None,
-            difficulty: mining_opts.target_tx_size as u32,
-        };
-        
-        let mining_result = mine_transaction(tx, bitwork, mining_opts)?;
-        tx = mining_result.transaction;
+    // Create reveal transaction
+    let reveal_tx = Transaction {
+        version: Version(2),
+        lock_time: bitcoin::absolute::LockTime::ZERO,
+        input: vec![],
+        output: vec![
+            TxOut {
+                value: Amount::from_sat(config.mint_amount.0),
+                script_pubkey: address.script_pubkey(),
+            },
+        ],
+    };
+
+    let mut reveal_psbt = Psbt::from_unsigned_tx(reveal_tx)
+        .map_err(|e| Error::PsbtError(format!("Failed to create reveal PSBT: {}", e)))?;
+    log!("Created reveal PSBT");
+
+    // Mine transactions if needed
+    if let Some(ref mining_opts) = mining_options {
+        if let Some(ref bitworkc) = config.mint_bitworkc {
+            log!("Mining commit transaction...");
+            let commit_tx = commit_psbt.extract_tx()
+                .map_err(|e| Error::TransactionError(format!("Failed to extract commit tx for mining: {}", e)))?;
+            let mining_result = mine_transaction(
+                commit_tx,
+                BitworkInfo::new(bitworkc.clone()),
+                mining_opts.clone(),
+            ).await?;
+            
+            if let Some(mined_tx) = mining_result.tx {
+                commit_psbt = Psbt::from_unsigned_tx(mined_tx)
+                    .map_err(|e| Error::PsbtError(format!("Failed to create PSBT after mining commit tx: {}", e)))?;
+                log!("Commit transaction mined successfully");
+            } else {
+                return Err(Error::MiningError("Failed to mine commit transaction".into()));
+            }
+        }
+
+        if let Some(ref bitworkr) = config.mint_bitworkr {
+            log!("Mining reveal transaction...");
+            let reveal_tx = reveal_psbt.extract_tx()
+                .map_err(|e| Error::TransactionError(format!("Failed to extract reveal tx for mining: {}", e)))?;
+            let mining_result = mine_transaction(
+                reveal_tx,
+                BitworkInfo::new(bitworkr.clone()),
+                mining_opts.clone(),
+            ).await?;
+            
+            if let Some(mined_tx) = mining_result.tx {
+                reveal_psbt = Psbt::from_unsigned_tx(mined_tx)
+                    .map_err(|e| Error::PsbtError(format!("Failed to create PSBT after mining reveal tx: {}", e)))?;
+                log!("Reveal transaction mined successfully");
+            } else {
+                return Err(Error::MiningError("Failed to mine reveal transaction".into()));
+            }
+        }
     }
 
-    Ok(AtomicalsTx::new(tx, outputs))
+    // Sign transactions
+    log!("Signing transactions...");
+    let signed_commit = wallet.sign_psbt(commit_psbt).await?;
+    let signed_reveal = wallet.sign_psbt(reveal_psbt).await?;
+
+    // Extract transactions
+    let commit_tx = signed_commit.extract_tx()
+        .map_err(|e| Error::TransactionError(format!("Failed to extract commit tx: {}", e)))?;
+
+    let reveal_tx = signed_reveal.extract_tx()
+        .map_err(|e| Error::TransactionError(format!("Failed to extract reveal tx: {}", e)))?;
+
+    // Broadcast commit transaction
+    let commit_txid = wallet.broadcast_transaction(commit_tx.clone()).await?;
+
+    // Broadcast reveal transaction
+    let reveal_txid = wallet.broadcast_transaction(reveal_tx.clone()).await?;
+
+    // Create AtomicalsTx
+    let atomicals_tx = AtomicalsTx::new_with_commit_reveal(
+        commit_tx,
+        reveal_tx,
+        Some(commit_txid),
+        Some(reveal_txid),
+    );
+
+    Ok(atomicals_tx)
 }

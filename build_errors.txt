@@ -1,23 +1,85 @@
     Checking atomicals-rs v0.1.0 (/mnt/d/atom/atomicalsR)
-warning: unused import: `AtomicalsTx`
- --> src/operations/mining.rs:1:20
+error[E0432]: unresolved import `mining::create_mining_tx`
+ --> src/operations/mod.rs:4:36
   |
-1 | use crate::types::{AtomicalsTx, mint::BitworkInfo};
-  |                    ^^^^^^^^^^^
+4 | pub use mining::{mine_transaction, create_mining_tx, MiningOptions, MiningResult};
+  |                                    ^^^^^^^^^^^^^^^^ no `create_mining_tx` in `operations::mining`
+
+warning: unused imports: `address` and `psbt`
+ --> src/errors/mod.rs:3:15
+  |
+3 | use bitcoin::{address, psbt};
+  |               ^^^^^^^  ^^^^
   |
   = note: `#[warn(unused_imports)]` on by default
 
-warning: unused import: `serde_json::json`
- --> src/operations/mining.rs:7:5
+warning: unused import: `Error`
+ --> src/operations/mining.rs:2:21
   |
-7 | use serde_json::json;
-  |     ^^^^^^^^^^^^^^^^
+2 | use crate::errors::{Error, Result};
+  |                     ^^^^^
 
-warning: unused imports: `ScriptBuf` and `TxIn`
- --> src/operations/mint_ft.rs:7:28
+warning: unused imports: `OutPoint`, `Script`, `Sequence`, and `TxIn`
+ --> src/operations/mining.rs:3:28
   |
-7 | use bitcoin::{Transaction, TxIn, TxOut, ScriptBuf, Address, Network};
-  |                            ^^^^         ^^^^^^^^^
+3 | use bitcoin::{Transaction, TxIn, OutPoint, Sequence, Script};
+  |                            ^^^^  ^^^^^^^^  ^^^^^^^^  ^^^^^^
+
+warning: unused imports: `Duration` and `Instant`
+ --> src/operations/mining.rs:4:17
+  |
+4 | use std::time::{Duration, Instant};
+  |                 ^^^^^^^^  ^^^^^^^
+
+warning: unused import: `wasm_bindgen::prelude::*`
+ --> src/operations/mining.rs:5:5
+  |
+5 | use wasm_bindgen::prelude::*;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `MessageEvent`, `WorkerOptions`, and `Worker`
+ --> src/operations/mining.rs:6:15
+  |
+6 | use web_sys::{Worker, MessageEvent, WorkerOptions};
+  |               ^^^^^^  ^^^^^^^^^^^^  ^^^^^^^^^^^^^
+
+warning: unused imports: `Receiver`, `Sender`, and `channel`
+ --> src/operations/mining.rs:7:30
+  |
+7 | use futures::channel::mpsc::{channel, Sender, Receiver};
+  |                              ^^^^^^^  ^^^^^^  ^^^^^^^^
+
+warning: unused import: `futures::StreamExt`
+ --> src/operations/mining.rs:8:5
+  |
+8 | use futures::StreamExt;
+  |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+ --> src/operations/mining.rs:9:5
+  |
+9 | use std::sync::Arc;
+  |     ^^^^^^^^^^^^^^
+
+warning: unused imports: `AtomicBool`, `AtomicU32`, and `Ordering`
+  --> src/operations/mining.rs:10:25
+   |
+10 | use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+   |                         ^^^^^^^^^^  ^^^^^^^^^  ^^^^^^^^
+
+warning: unused macro definition: `log`
+  --> src/operations/mining.rs:19:14
+   |
+19 | macro_rules! log {
+   |              ^^^
+   |
+   = note: `#[warn(unused_macros)]` on by default
+
+warning: unused imports: `TxIn` and `Txid`
+ --> src/operations/mint_ft.rs:5:45
+  |
+5 | use bitcoin::{Amount, Network, Transaction, TxIn, TxOut, Txid};
+  |                                             ^^^^         ^^^^
 
 warning: unused import: `bitcoin::Script`
  --> src/types/atomicals.rs:3:5
@@ -25,63 +87,135 @@ warning: unused import: `bitcoin::Script`
 3 | use bitcoin::Script;
   |     ^^^^^^^^^^^^^^^
 
-warning: unused import: `crate::types::AtomicalsTx`
- --> src/wallet/web/unisat.rs:2:5
+warning: unused import: `bitcoin::Transaction`
+  --> src/types/mod.rs:13:5
+   |
+13 | use bitcoin::Transaction;
+   |     ^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `Deserialize` and `Serialize`
+  --> src/types/mod.rs:14:13
+   |
+14 | use serde::{Serialize, Deserialize};
+   |             ^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `Promise`
+ --> src/wallet/web/unisat.rs:7:32
   |
-2 | use crate::types::AtomicalsTx;
+7 | use js_sys::{Function, Object, Promise, Reflect, Array};
+  |                                ^^^^^^^
+
+warning: unused import: `Promise`
+ --> src/wallet/web/wizz.rs:7:32
+  |
+7 | use js_sys::{Function, Object, Promise, Reflect, Array};
+  |                                ^^^^^^^
+
+warning: unused import: `crate::types::AtomicalsTx`
+ --> src/wallet/mod.rs:7:5
+  |
+7 | use crate::types::AtomicalsTx;
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-warning: unused imports: `Window` and `window`
- --> src/wallet/web/unisat.rs:6:15
+warning: unused import: `MintConfig`
+ --> src/wasm/mod.rs:2:33
   |
-6 | use web_sys::{window, Window};
-  |               ^^^^^^  ^^^^^^
+2 | use crate::types::{Arc20Config, MintConfig};
+  |                                 ^^^^^^^^^^
 
-warning: unused import: `serde_wasm_bindgen`
- --> src/wallet/web/unisat.rs:9:5
-  |
-9 | use serde_wasm_bindgen;
-  |     ^^^^^^^^^^^^^^^^^^
-
-warning: unused import: `crate::types::AtomicalsTx`
- --> src/wallet/mod.rs:6:5
-  |
-6 | use crate::types::AtomicalsTx;
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: unused variable: `public_key`
-  --> src/operations/mint_ft.rs:35:9
+error[E0277]: the trait bound `std::result::Result<Atomicals, errors::Error>: ReturnWasmAbi` is not satisfied
+  --> src/wasm/mod.rs:12:1
    |
-35 |     let public_key = wallet.get_public_key().await.map_err(|e| Error::WalletError(e.to_string()))?;
-   |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_public_key`
+12 | #[wasm_bindgen]
+   | ^^^^^^^^^^^^^^^ the trait `ReturnWasmAbi` is not implemented for `std::result::Result<Atomicals, errors::Error>`
    |
-   = note: `#[warn(unused_variables)]` on by default
+   = help: the trait `ReturnWasmAbi` is implemented for `std::result::Result<T, E>`
+   = note: this error originates in the attribute macro `wasm_bindgen::prelude::__wasm_bindgen_class_marker` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-warning: unused import: `rayon::prelude`
- --> src/operations/mining.rs:6:5
-  |
-6 | use rayon::prelude::*;
-  |     ^^^^^^^^^^^^^^
+error[E0063]: missing fields `meta`, `mint_bitworkc` and `mint_bitworkr` in initializer of `Arc20Config`
+  --> src/wasm/mod.rs:28:22
+   |
+28 |         let config = Arc20Config {
+   |                      ^^^^^^^^^^^ missing `meta`, `mint_bitworkc` and `mint_bitworkr`
 
-warning: unused variable: `input_txouts`
-   --> src/wallet/web/unisat.rs:133:55
+error[E0277]: the trait bound `std::result::Result<Atomicals, errors::Error>: ReturnWasmAbi` is not satisfied
+  --> src/wasm/mod.rs:15:21
+   |
+15 |     pub fn new() -> Result<Atomicals> {
+   |                     ^^^^^^^^^^^^^^^^^ the trait `ReturnWasmAbi` is not implemented for `std::result::Result<Atomicals, errors::Error>`
+   |
+   = help: the trait `ReturnWasmAbi` is implemented for `std::result::Result<T, E>`
+
+error[E0277]: the trait bound `wasm_bindgen::JsValue: From<errors::Error>` is not satisfied
+   --> src/wasm/mod.rs:15:21
     |
-133 |     async fn sign_transaction(&self, tx: Transaction, input_txouts: &[TxOut]) -> Result<Transaction> {
-    |                                                       ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_input_txouts`
-
-warning: methods `sign_transaction` and `broadcast_transaction` are never used
-  --> src/wallet/web/unisat.rs:79:14
-   |
-38 | impl UnisatProvider {
-   | ------------------- methods in this implementation
+15  |     pub fn new() -> Result<Atomicals> {
+    |                     ^^^^^^^^^^^^^^^^^ the trait `From<errors::Error>` is not implemented for `wasm_bindgen::JsValue`, which is required by `std::result::Result<Atomicals, errors::Error>: WasmDescribe`
+    |
+    = help: the following other types implement trait `From<T>`:
+              `wasm_bindgen::JsValue` implements `From<&'a T>`
+              `wasm_bindgen::JsValue` implements `From<&'a std::string::String>`
+              `wasm_bindgen::JsValue` implements `From<&'a str>`
+              `wasm_bindgen::JsValue` implements `From<*const T>`
+              `wasm_bindgen::JsValue` implements `From<*mut T>`
+              `wasm_bindgen::JsValue` implements `From<ArrayBuffer>`
+              `wasm_bindgen::JsValue` implements `From<Atomicals>`
+              `wasm_bindgen::JsValue` implements `From<BigInt64Array>`
+            and 127 others
+    = note: required for `errors::Error` to implement `Into<wasm_bindgen::JsValue>`
+    = note: required for `std::result::Result<Atomicals, errors::Error>` to implement `WasmDescribe`
+note: required by a bound in `return_abi`
+   --> /home/ubuntu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-bindgen-0.2.100/src/convert/traits.rs:237:26
+    |
+237 | pub trait ReturnWasmAbi: WasmDescribe {
+    |                          ^^^^^^^^^^^^ required by this bound in `ReturnWasmAbi::return_abi`
 ...
-79 |     async fn sign_transaction(&self, tx: Transaction, _utxos: &[TxOut]) -> Result<Transaction> {
-   |              ^^^^^^^^^^^^^^^^
-...
-92 |     async fn broadcast_transaction(&self, tx: Transaction) -> Result<String> {
-   |              ^^^^^^^^^^^^^^^^^^^^^
-   |
-   = note: `#[warn(dead_code)]` on by default
+243 |     fn return_abi(self) -> Self::Abi;
+    |        ---------- required by a bound in this associated function
 
-warning: `atomicals-rs` (lib) generated 12 warnings (run `cargo fix --lib -p atomicals-rs` to apply 8 suggestions)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 46.03s
+error[E0277]: the trait bound `std::result::Result<wasm_bindgen::JsValue, errors::Error>: IntoJsResult` is not satisfied
+  --> src/wasm/mod.rs:27:10
+   |
+27 |     ) -> Result<JsValue> {
+   |          ^^^^^^^^^^^^^^^ the trait `IntoJsResult` is not implemented for `std::result::Result<wasm_bindgen::JsValue, errors::Error>`
+   |
+   = help: the following other types implement trait `IntoJsResult`:
+             std::result::Result<(), E>
+             std::result::Result<T, E>
+
+warning: unused variable: `tx`
+   --> src/operations/mining.rs:163:5
+    |
+163 |     tx: Transaction,
+    |     ^^ help: if this is intentional, prefix it with an underscore: `_tx`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `bitwork`
+   --> src/operations/mining.rs:164:5
+    |
+164 |     bitwork: BitworkInfo,
+    |     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bitwork`
+
+warning: unused variable: `options`
+   --> src/operations/mining.rs:165:5
+    |
+165 |     options: MiningOptions,
+    |     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_options`
+
+warning: unused variable: `commit_psbt`
+  --> src/wallet/mod.rs:21:49
+   |
+21 |     async fn sign_atomicals_transactions(&self, commit_psbt: Psbt, reveal_psbt: Psbt) -> Result<(Transaction, Transaction)> {
+   |                                                 ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_commit_psbt`
+
+warning: unused variable: `reveal_psbt`
+  --> src/wallet/mod.rs:21:68
+   |
+21 |     async fn sign_atomicals_transactions(&self, commit_psbt: Psbt, reveal_psbt: Psbt) -> Result<(Transaction, Transaction)> {
+   |                                                                    ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_reveal_psbt`
+
+Some errors have detailed explanations: E0063, E0277, E0432.
+For more information about an error, try `rustc --explain E0063`.
+warning: `atomicals-rs` (lib) generated 24 warnings
+error: could not compile `atomicals-rs` (lib) due to 6 previous errors; 24 warnings emitted

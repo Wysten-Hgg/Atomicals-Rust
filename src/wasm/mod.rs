@@ -1,122 +1,54 @@
 use wasm_bindgen::prelude::*;
-use crate::operations::mint_ft::mint_ft;
-use crate::types::{Amount, Arc20Config};
-use crate::wallet::web::{UnisatProvider, WizzProvider};
+use crate::types::{Arc20Config, MintConfig};
+use crate::operations::{mint_ft, mining::MiningOptions};
+use crate::wallet::web::WizzProvider;
+use std::collections::HashMap;
+use serde_json::Value;
 
-#[wasm_bindgen]
-pub struct AtomicalsWasm {
-    wallet_type: String,
+#[wasm_bindgen(js_name = "AtomicalsWasm")]
+pub struct Atomicals {
+    wallet: WizzProvider,
 }
 
-#[wasm_bindgen]
-impl AtomicalsWasm {
+#[wasm_bindgen(js_class = "AtomicalsWasm")]
+impl Atomicals {
     #[wasm_bindgen(constructor)]
-    pub fn new(wallet_type: String) -> Self {
-        Self { wallet_type }
+    pub fn try_new() -> std::result::Result<Atomicals, JsValue> {
+        let wallet = WizzProvider::try_new()?;
+        Ok(Atomicals { wallet })
     }
 
     #[wasm_bindgen]
     pub async fn mint_ft(
         &self,
         tick: String,
-        mint_amount: f64,
-        mint_bitworkc: Option<String>,
-    ) -> Result<String, JsValue> {
-        web_sys::console::log_1(&JsValue::from_str(&format!(
-            "Starting mint_ft with tick: {}, amount: {}, bitworkc: {:?}",
-            tick, mint_amount, mint_bitworkc
-        )));
-
-        // Validate input
-        if mint_amount <= 0.0 || mint_amount.fract() != 0.0 {
-            web_sys::console::error_1(&JsValue::from_str("Invalid mint amount"));
-            return Err(JsValue::from_str("Mint amount must be a positive integer"));
-        }
-
-        // Create config
-        web_sys::console::log_1(&JsValue::from_str("Creating Arc20Config..."));
-        let config = match Arc20Config::new(
+        mint_amount: u64,
+        bitwork_c: Option<String>,
+        bitwork_r: Option<String>,
+        num_workers: Option<u32>,
+        batch_size: Option<u32>,
+    ) -> std::result::Result<JsValue, JsValue> {
+        let config = Arc20Config {
             tick,
-            Amount(mint_amount as u64),
-        ) {
-            Ok(cfg) => cfg,
-            Err(e) => {
-                web_sys::console::error_1(&JsValue::from_str(&format!(
-                    "Failed to create Arc20Config: {}", e
-                )));
-                return Err(JsValue::from_str(&e.to_string()));
-            }
+            mint_amount: crate::types::Amount(mint_amount),
+            mint_bitworkc: bitwork_c,
+            mint_bitworkr: bitwork_r,
+            meta: HashMap::new(),
         };
 
-        // Add bitwork if provided
-        let config = if let Some(bitwork) = mint_bitworkc {
-            web_sys::console::log_1(&JsValue::from_str(&format!(
-                "Adding bitwork: {}", bitwork
-            )));
-            match config.with_bitworkc(bitwork) {
-                Ok(cfg) => cfg,
-                Err(e) => {
-                    web_sys::console::error_1(&JsValue::from_str(&format!(
-                        "Failed to add bitwork: {}", e
-                    )));
-                    return Err(JsValue::from_str(&e.to_string()));
-                }
-            }
+        let mining_options = if num_workers.is_some() || batch_size.is_some() {
+            Some(MiningOptions {
+                num_workers: num_workers.unwrap_or(4),
+                batch_size: batch_size.unwrap_or(1000),
+            })
         } else {
-            web_sys::console::log_1(&JsValue::from_str("No bitwork provided"));
-            config
+            None
         };
 
-        // Get wallet provider
-        web_sys::console::log_1(&JsValue::from_str(&format!(
-            "Using wallet type: {}", self.wallet_type
-        )));
-        let result = match self.wallet_type.as_str() {
-            "unisat" => {
-                let wallet = match UnisatProvider::new() {
-                    Ok(w) => w,
-                    Err(e) => {
-                        web_sys::console::error_1(&JsValue::from_str(&format!(
-                            "Failed to initialize UniSat wallet: {}", e
-                        )));
-                        return Err(JsValue::from_str(&format!("Failed to initialize UniSat wallet: {}", e)));
-                    }
-                };
-                mint_ft(&wallet, config, None).await
-            }
-            "wizz" => {
-                let wallet = match WizzProvider::new() {
-                    Ok(w) => w,
-                    Err(e) => {
-                        web_sys::console::error_1(&JsValue::from_str(&format!(
-                            "Failed to initialize Wizz wallet: {}", e
-                        )));
-                        return Err(JsValue::from_str(&format!("Failed to initialize Wizz wallet: {}", e)));
-                    }
-                };
-                mint_ft(&wallet, config, None).await
-            }
-            _ => {
-                web_sys::console::error_1(&JsValue::from_str("Unsupported wallet type"));
-                return Err(JsValue::from_str("Unsupported wallet type"));
-            }
-        };
-
-        // Return transaction ID
-        match result {
-            Ok(tx) => {
-                let txid = tx.txid();
-                web_sys::console::log_1(&JsValue::from_str(&format!(
-                    "Successfully minted FT with txid: {}", txid
-                )));
-                Ok(txid)
-            },
-            Err(e) => {
-                web_sys::console::error_1(&JsValue::from_str(&format!(
-                    "Failed to mint FT: {}", e
-                )));
-                Err(JsValue::from_str(&format!("Failed to mint FT: {}", e)))
-            },
-        }
+        let result = mint_ft::mint_ft(&self.wallet, config, mining_options).await
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+            
+        serde_wasm_bindgen::to_value(&result)
+            .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
     }
 }

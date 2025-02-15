@@ -1,243 +1,145 @@
-use crate::types::{AtomicalsTx, mint::BitworkInfo};
 use crate::errors::{Error, Result};
-use bitcoin::{Transaction, TxIn, TxOut, Script};
-use bitcoin::absolute::LockTime;
-use rand::{thread_rng, Rng};
-use rayon::prelude::*;
-use serde_json::json;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use crate::types::mint::BitworkInfo;
+use bitcoin::Transaction;
+use bitcoin::transaction::Version;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicBool, Ordering};
+use web_sys::{Worker, WorkerOptions};
+use wasm_bindgen::prelude::*;
+use serde::{Serialize, Deserialize};
+use wasm_bindgen::JsCast;
+use js_sys;
 
-const MAX_TRANSACTION_SIZE: usize = 100_000; // 100KB
-const NONCE_RANGE_PER_THREAD: u32 = 1_000_000;
+#[cfg(target_arch = "wasm32")]
+macro_rules! log {
+    ($($t:tt)*) => (web_sys::console::log_1(&format!($($t)*).into()))
+}
 
-#[derive(Debug, Clone)]
+#[cfg(not(target_arch = "wasm32"))]
+macro_rules! log {
+    ($($t:tt)*) => (log::info!($($t)*))
+}
+
+#[derive(Clone)]
 pub struct MiningOptions {
-    pub max_tries: u64,
-    pub threads: usize,
-    pub timeout_secs: u64,
-    pub target_tx_size: usize,
+    pub num_workers: u32,
+    pub batch_size: u32,
 }
 
 impl Default for MiningOptions {
     fn default() -> Self {
         Self {
-            max_tries: 1_000_000,
-            threads: num_cpus::get(),
-            timeout_secs: 3600, // 1 hour
-            target_tx_size: 1000, // Target transaction size in bytes
+            num_workers: 4,
+            batch_size: 1000,
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone)]
 pub struct MiningResult {
-    pub transaction: Transaction,
-    pub nonce: u32,
-    pub attempts: u64,
-    pub duration: Duration,
-    pub hash_rate: f64, // Hashes per second
+    pub success: bool,
+    pub nonce: Option<u32>,
+    pub tx: Option<Transaction>,
 }
 
-pub fn mine_transaction(
+pub async fn mine_transaction(
     mut tx: Transaction,
     bitwork: BitworkInfo,
     options: MiningOptions,
 ) -> Result<MiningResult> {
-    web_sys::console::log_1(&format!("Starting mining with difficulty: {}", bitwork.difficulty).into());
+    log!("Starting mining with {} workers", options.num_workers);
     
-    // Validate transaction size
-    let tx_size = bitcoin::consensus::encode::serialize(&tx).len();
-    if tx_size > MAX_TRANSACTION_SIZE {
-        return Err(Error::MiningError(
-            format!("Transaction size {} exceeds maximum {}", tx_size, MAX_TRANSACTION_SIZE)
-        ));
+    // Initialize mining state
+    let stop_mining = Arc::new(AtomicBool::new(false));
+    let mut workers = Vec::new();
+    
+    // Create workers
+    for i in 0..options.num_workers {
+        let start_nonce = i * options.batch_size;
+        let end_nonce = start_nonce + options.batch_size;
+        
+        // Clone data for worker
+        let worker_tx = tx.clone();
+        let worker_bitwork = bitwork.clone();
+        let worker_stop = stop_mining.clone();
+        
+        // Create worker
+        let mut opts = WorkerOptions::new();
+        js_sys::Reflect::set(
+            &opts,
+            &JsValue::from_str("type"),
+            &JsValue::from_str("module"),
+        ).map_err(|e| Error::WorkerError(format!("Failed to set worker type: {:?}", e)))?;
+        
+        let worker = Worker::new_with_options("./worker.js", &opts)
+            .map_err(|e| Error::WorkerError(format!("Failed to create worker: {:?}", e)))?;
+            
+        // Initialize worker with mining task
+        let task = MiningTask {
+            tx: worker_tx,
+            start_nonce,
+            end_nonce,
+            bitwork_prefix: worker_bitwork.difficulty.to_string(),
+        };
+        
+        worker.post_message(&serde_wasm_bindgen::to_value(&task).unwrap())
+            .map_err(|e| Error::WorkerError(format!("Failed to send task to worker: {:?}", e)))?;
+            
+        workers.push(worker);
     }
-
-    // Add a dummy input for nonce if no inputs exist
-    if tx.input.is_empty() {
-        web_sys::console::log_1(&"Adding dummy input for nonce".into());
-        tx.input.push(TxIn {
-            previous_output: bitcoin::OutPoint::null(),
-            script_sig: Script::empty().into(),
-            sequence: bitcoin::Sequence(0),
-            witness: bitcoin::Witness::default(),
-        });
-    }
-
-    let start_time = Instant::now();
-    let found = Arc::new(AtomicBool::new(false));
-    let attempts = Arc::new(AtomicU64::new(0));
-
-    // Create thread pool with specified number of threads
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(options.threads)
-        .build()
-        .map_err(|e| Error::MiningError(format!("Failed to create thread pool: {}", e)))?;
-
-    web_sys::console::log_1(&format!("Created mining pool with {} threads", options.threads).into());
-
-    // Split the nonce range into chunks for each thread
-    let chunks: Vec<_> = (0..options.threads)
-        .map(|i| {
-            let start = (i as u32) * NONCE_RANGE_PER_THREAD;
-            let end = start + NONCE_RANGE_PER_THREAD;
-            (start, end)
-        })
-        .collect();
-
-    // Mining result channel
-    let (tx_sender, rx_receiver) = std::sync::mpsc::channel();
-
-    // Spawn mining threads
-    pool.scope(|s| {
-        for (start, end) in chunks {
-            let tx_clone = tx.clone();
-            let found = found.clone();
-            let attempts = attempts.clone();
-            let tx_sender = tx_sender.clone();
-            let bitwork = bitwork.clone();
-
-            s.spawn(move |_| {
-                let mut rng = thread_rng();
-                let mut nonce_counter = start;
-
-                while !found.load(Ordering::Relaxed) 
-                    && nonce_counter < end 
-                    && attempts.load(Ordering::Relaxed) < options.max_tries {
-                    
-                    // Check timeout
-                    if start_time.elapsed().as_secs() > options.timeout_secs {
-                        web_sys::console::log_1(&"Mining timeout reached".into());
-                        found.store(true, Ordering::Relaxed);
-                        break;
-                    }
-
-                    // Generate random nonce within our range
-                    let nonce = rng.gen_range(nonce_counter..end);
-                    nonce_counter = nonce + 1;
-                    
-                    // Update nonce in transaction
-                    let mut tx_attempt = tx_clone.clone();
-                    if let Some(input) = tx_attempt.input.get_mut(0) {
-                        input.sequence = bitcoin::Sequence(nonce);
-                    }
-
-                    // Calculate txid
-                    let txid = tx_attempt.txid().to_string();
-                    attempts.fetch_add(1, Ordering::Relaxed);
-
-                    if attempts.load(Ordering::Relaxed) % 1000 == 0 {
-                        web_sys::console::log_1(&format!(
-                            "Mining progress: {} attempts, current txid: {}", 
-                            attempts.load(Ordering::Relaxed), 
-                            txid
-                        ).into());
-                    }
-
-                    // Check if txid matches bitwork requirements
-                    if bitwork.matches(&txid) {
-                        web_sys::console::log_1(&format!("Found matching txid: {}", txid).into());
-                        found.store(true, Ordering::Relaxed);
-                        let duration = start_time.elapsed();
-                        let total_attempts = attempts.load(Ordering::Relaxed);
-                        let hash_rate = total_attempts as f64 / duration.as_secs_f64();
-
-                        let result = MiningResult {
-                            transaction: tx_attempt,
-                            nonce,
-                            attempts: total_attempts,
-                            duration,
-                            hash_rate,
-                        };
-
-                        tx_sender.send(Some(result)).ok();
-                        break;
-                    }
-                }
-            });
-        }
-    });
-
-    // Drop the original sender to close the channel
-    drop(tx_sender);
-
-    web_sys::console::log_1(&"Waiting for mining result...".into());
-
-    // Get the result
-    match rx_receiver.recv() {
+    
+    // Wait for result from any worker
+    let result = match wait_for_mining_result(&workers, &stop_mining).await {
         Ok(Some(result)) => {
-            web_sys::console::log_1(&format!(
-                "Mining completed: {} attempts in {:?}, hash rate: {:.2} H/s",
-                result.attempts,
-                result.duration,
-                result.hash_rate
-            ).into());
-            Ok(result)
+            // Stop other workers
+            stop_mining.store(true, Ordering::SeqCst);
+            
+            // Update transaction with mining result
+            if let Some(nonce) = result.nonce {
+                tx.version = Version(nonce as i32);
+                
+                MiningResult {
+                    success: true,
+                    nonce: Some(nonce),
+                    tx: Some(tx),
+                }
+            } else {
+                MiningResult {
+                    success: false,
+                    nonce: None,
+                    tx: None,
+                }
+            }
+        }
+        Ok(None) => MiningResult {
+            success: false,
+            nonce: None,
+            tx: None,
         },
-        Ok(None) => {
-            web_sys::console::error_1(&"Mining failed: no result found".into());
-            Err(Error::MiningError("Mining failed: no result found".into()))
-        },
-        Err(_) => {
-            web_sys::console::error_1(&"Mining failed: channel closed".into());
-            Err(Error::MiningError("Mining failed: channel closed".into()))
-        },
-    }
-}
-
-// Helper function to create a mining transaction template
-pub fn create_mining_tx(
-    inputs: Vec<TxIn>,
-    outputs: Vec<TxOut>,
-    data: Vec<u8>,
-) -> Result<Transaction> {
-    // Validate inputs and outputs
-    if inputs.is_empty() {
-        return Err(Error::MiningError("No inputs provided".into()));
-    }
-    if outputs.is_empty() {
-        return Err(Error::MiningError("No outputs provided".into()));
-    }
-
-    let mut tx = Transaction {
-        version: 2,
-        lock_time: LockTime::ZERO,
-        input: inputs,
-        output: outputs,
+        Err(e) => return Err(e),
     };
-
-    // Add OP_RETURN output with mining data if provided
-    if !data.is_empty() {
-        let mut array = [0u8; 32];
-        array[..data.len().min(32)].copy_from_slice(&data[..data.len().min(32)]);
-        let script = bitcoin::script::Builder::new()
-            .push_opcode(bitcoin::opcodes::all::OP_RETURN)
-            .push_slice(&array)
-            .into_script();
-        tx.output.push(TxOut {
-            value: 0,
-            script_pubkey: script,
-        });
+    
+    // Clean up workers
+    for worker in workers {
+        worker.terminate();
     }
-
-    // Validate final transaction size
-    let tx_size = bitcoin::consensus::encode::serialize(&tx).len();
-    if tx_size > MAX_TRANSACTION_SIZE {
-        return Err(Error::MiningError(
-            format!("Transaction size {} exceeds maximum {}", tx_size, MAX_TRANSACTION_SIZE)
-        ));
-    }
-
-    Ok(tx)
+    
+    Ok(result)
 }
 
-// Helper function to estimate mining time based on bitwork difficulty
-pub fn estimate_mining_time(bitwork: &BitworkInfo) -> Duration {
-    let difficulty = bitwork.difficulty as f64;
-    let hashes_needed = 16f64.powi(difficulty as i32);
-    let hashes_per_second = 100_000f64; // Estimated hashes per second
-    let seconds = hashes_needed / hashes_per_second;
-    Duration::from_secs_f64(seconds)
+#[derive(Clone, Serialize, Deserialize)]
+pub struct MiningTask {
+    pub tx: Transaction,
+    pub start_nonce: u32,
+    pub end_nonce: u32,
+    pub bitwork_prefix: String,
+}
+
+async fn wait_for_mining_result(
+    workers: &[Worker],
+    stop_mining: &Arc<AtomicBool>,
+) -> Result<Option<MiningResult>> {
+    // TODO: Implement actual worker message handling
+    // For now, just return None to indicate no solution found
+    Ok(None)
 }

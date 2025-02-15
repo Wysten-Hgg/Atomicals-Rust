@@ -1,140 +1,114 @@
 use crate::errors::{Error, Result};
-use crate::types::AtomicalsTx;
 use crate::wallet::WalletProvider;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::JsFuture;
-use web_sys::{window, Window};
-use bitcoin::{Transaction, TxOut};
-use hex;
-use serde_wasm_bindgen;
 use async_trait::async_trait;
+use bitcoin::{Transaction, TxOut, Network, PublicKey};
+use bitcoin::psbt::Psbt;
+use wasm_bindgen::prelude::*;
+use js_sys::{Function, Object, Promise, Reflect, Array};
+use serde_wasm_bindgen::{to_value, from_value};
+use std::str::FromStr;
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
 #[wasm_bindgen]
-extern "C" {
-    type UniSat;
-
-    #[wasm_bindgen(js_namespace = window)]
-    fn unisat() -> UniSat;
-
-    #[wasm_bindgen(method, js_name = "getAccounts")]
-    fn get_accounts(this: &UniSat) -> js_sys::Promise;
-
-    #[wasm_bindgen(method, js_name = "signTransaction")]
-    fn sign_transaction(this: &UniSat, tx: &str) -> js_sys::Promise;
-
-    #[wasm_bindgen(method, js_name = "sendTransaction")]
-    fn send_transaction(this: &UniSat, tx: &str) -> js_sys::Promise;
-
-    #[wasm_bindgen(method, js_name = "getNetwork")]
-    fn get_network(this: &UniSat) -> js_sys::Promise;
-}
-
-#[derive(Clone)]
+#[derive(Debug)]
 pub struct UnisatProvider {
-    window: web_sys::Window,
+    wallet: Object,
 }
 
-// 实现 Send 和 Sync，因为我们知道 Window 在 WASM 环境中是线程安全的
-unsafe impl Send for UnisatProvider {}
-unsafe impl Sync for UnisatProvider {}
-
+#[wasm_bindgen]
 impl UnisatProvider {
-    pub fn new() -> Result<Self> {
+    #[wasm_bindgen(constructor)]
+    pub fn try_new() -> std::result::Result<UnisatProvider, JsValue> {
         let window = web_sys::window()
-            .ok_or_else(|| Error::WasmError("Failed to get window".to_string()))?;
-        Ok(Self { window })
-    }
-
-    fn get_unisat(&self) -> Result<UniSat> {
-        let unisat = js_sys::Reflect::get(&self.window, &"unisat".into())
-            .map_err(|e| Error::WasmError(format!("Failed to get unisat: {:?}", e)))?;
-        Ok(unisat.unchecked_into())
-    }
-
-    pub async fn get_public_key(&self) -> Result<String> {
-        let unisat = self.get_unisat()?;
-        let accounts = JsFuture::from(unisat.get_accounts())
-            .await
-            .map_err(|e| Error::WasmError(format!("Failed to get accounts: {:?}", e)))?;
-        let accounts: Vec<String> = serde_wasm_bindgen::from_value(accounts)
-            .map_err(|e| Error::WasmError(format!("Failed to parse accounts: {:?}", e)))?;
-        accounts.first()
-            .cloned()
-            .ok_or_else(|| Error::WasmError("No accounts found".to_string()))
-    }
-
-    pub async fn get_address(&self) -> Result<String> {
-        let unisat = self.get_unisat()?;
-        let accounts = JsFuture::from(unisat.get_accounts())
-            .await
-            .map_err(|e| Error::WasmError(format!("Failed to get accounts: {:?}", e)))?;
-        let accounts: Vec<String> = serde_wasm_bindgen::from_value(accounts)
-            .map_err(|e| Error::WasmError(format!("Failed to parse accounts: {:?}", e)))?;
-        accounts.first()
-            .cloned()
-            .ok_or_else(|| Error::WasmError("No accounts found".to_string()))
-    }
-
-    pub async fn get_network(&self) -> Result<String> {
-        let unisat = self.get_unisat()?;
-        let network = JsFuture::from(unisat.get_network())
-            .await
-            .map_err(|e| Error::WasmError(format!("Failed to get network: {:?}", e)))?;
-        let network: String = serde_wasm_bindgen::from_value(network)
-            .map_err(|e| Error::WasmError(format!("Failed to parse network: {:?}", e)))?;
-        Ok(network)
-    }
-
-    pub async fn sign_transaction(&self, tx: Transaction, _utxos: &[TxOut]) -> Result<Transaction> {
-        let unisat = self.get_unisat()?;
-        let tx_hex = hex::encode(bitcoin::consensus::serialize(&tx));
+            .ok_or_else(|| JsValue::from_str("Window not available"))?;
+        let unisat = Reflect::get(&window, &"unisat".into())
+            .map_err(|_| JsValue::from_str("Unisat wallet not found"))?;
         
-        let signed_tx = JsFuture::from(unisat.sign_transaction(&tx_hex))
-            .await
-            .map_err(|e| Error::WasmError(format!("Failed to sign transaction: {:?}", e)))?;
-        
-        let signed_tx_hex: String = serde_wasm_bindgen::from_value(signed_tx)
-            .map_err(|e| Error::WasmError(format!("Failed to parse signed transaction: {:?}", e)))?;
-        
-        let signed_tx_bytes = hex::decode(signed_tx_hex)
-            .map_err(|e| Error::WasmError(format!("Failed to decode signed transaction: {:?}", e)))?;
-        
-        bitcoin::consensus::deserialize(&signed_tx_bytes)
-            .map_err(|e| Error::WasmError(format!("Failed to deserialize signed transaction: {:?}", e)))
-    }
-
-    pub async fn broadcast_transaction(&self, tx: Transaction) -> Result<String> {
-        let unisat = self.get_unisat()?;
-        let tx_hex = hex::encode(bitcoin::consensus::serialize(&tx));
-        
-        let txid = JsFuture::from(unisat.send_transaction(&tx_hex))
-            .await
-            .map_err(|e| Error::WasmError(format!("Failed to broadcast transaction: {:?}", e)))?;
-        
-        serde_wasm_bindgen::from_value(txid)
-            .map_err(|e| Error::WasmError(format!("Failed to parse txid: {:?}", e)))
+        Ok(UnisatProvider {
+            wallet: unisat.unchecked_into(),
+        })
     }
 }
 
 #[async_trait(?Send)]
 impl WalletProvider for UnisatProvider {
-    async fn get_public_key(&self) -> Result<String> {
-        self.get_public_key().await
+    async fn get_network(&self) -> Result<Network> {
+        let network = self.call_wallet_method("getNetwork", &[])?;
+        let network_str: String = from_value(network)?;
+        
+        match network_str.as_str() {
+            "mainnet" => Ok(Network::Bitcoin),
+            "testnet" => Ok(Network::Testnet),
+            _ => Err(Error::NetworkError(format!("Unsupported network: {}", network_str))),
+        }
+    }
+
+    async fn get_public_key(&self) -> Result<PublicKey> {
+        let pubkey = self.call_wallet_method("getPublicKey", &[])?;
+        let pubkey_str: String = from_value(pubkey)?;
+        
+        PublicKey::from_str(&pubkey_str)
+            .map_err(|e| Error::WalletError(format!("Invalid public key: {}", e)))
     }
 
     async fn get_address(&self) -> Result<String> {
-        self.get_address().await
+        let address = self.call_wallet_method("getAddress", &[])?;
+        from_value(address)
+            .map_err(|e| Error::WalletError(format!("Failed to get address: {}", e)))
     }
 
-    async fn get_network(&self) -> Result<String> {
-        self.get_network().await
-    }
-
-    async fn sign_transaction(&self, tx: Transaction, input_txouts: &[TxOut]) -> Result<Transaction> {
-        self.sign_transaction(tx, input_txouts).await
+    async fn sign_transaction(&self, tx: Transaction, outputs: &[TxOut]) -> Result<Transaction> {
+        let tx_hex = bitcoin::consensus::encode::serialize_hex(&tx);
+        
+        let args = vec![
+            to_value(&tx_hex)?,
+            to_value(&outputs)?,
+        ];
+        
+        let result = self.call_wallet_method("signTransaction", &args)?;
+        
+        let signed_tx_hex: String = from_value(result)?;
+        let tx_bytes = hex::decode(signed_tx_hex)?;
+        let signed_tx = bitcoin::consensus::encode::deserialize(&tx_bytes)?;
+        
+        Ok(signed_tx)
     }
 
     async fn broadcast_transaction(&self, tx: Transaction) -> Result<String> {
-        self.broadcast_transaction(tx).await
+        let tx_hex = bitcoin::consensus::encode::serialize_hex(&tx);
+        let result = self.call_wallet_method("broadcastTransaction", &[to_value(&tx_hex)?])?;
+        
+        from_value(result)
+            .map_err(|e| Error::WalletError(format!("Failed to broadcast transaction: {}", e)))
+    }
+
+    async fn sign_psbt(&self, psbt: Psbt) -> Result<Psbt> {
+        let psbt_bytes = psbt.serialize();
+        let psbt_base64 = BASE64.encode(psbt_bytes);
+        
+        let result = self.call_wallet_method("signPsbt", &[to_value(&psbt_base64)?])?;
+        
+        let signed_psbt_str: String = from_value(result)?;
+        let signed_psbt_bytes = BASE64.decode(signed_psbt_str.as_bytes())
+            .map_err(|e| Error::WalletError(format!("Failed to decode base64 PSBT: {}", e)))?;
+        
+        Psbt::deserialize(&signed_psbt_bytes)
+            .map_err(|e| Error::WalletError(format!("Failed to parse signed PSBT: {}", e)))
+    }
+}
+
+impl UnisatProvider {
+    fn call_wallet_method(&self, method: &str, args: &[JsValue]) -> Result<JsValue> {
+        let method_fn = Reflect::get(&self.wallet, &method.into())
+            .map_err(|_| Error::WalletError(format!("Method {} not found", method)))?;
+        
+        let method_fn: Function = method_fn.unchecked_into();
+        let args_array = Array::new();
+        for arg in args {
+            args_array.push(arg);
+        }
+        
+        method_fn.apply(&self.wallet, &args_array)
+            .map_err(|e| Error::WalletError(format!("Failed to call {}: {:?}", method, e)))
     }
 }

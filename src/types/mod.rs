@@ -9,3 +9,6 @@ pub use arc20::{Arc20Config, Arc20Token};
 pub use mint::{MintConfig, MintResult};
 pub use atomicals::*;
 pub use transaction::AtomicalsTx;
+
+use bitcoin::Transaction;
+use serde::{Serialize, Deserialize};

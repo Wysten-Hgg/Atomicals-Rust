@@ -10,7 +10,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "1.0"
 anyhow = "1.0"
-bitcoin = { version = "0.30", features = ["rand", "serde"] }
+bitcoin = { version = "0.31", features = ["rand", "serde", "std"] }
 async-trait = "0.1"
 tracing = { version = "0.1", features = ["attributes"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "chrono"] }
@@ -41,23 +41,29 @@ web-sys = { version = "0.3", features = [
     "Crypto",
     "CryptoKey",
     "Performance",
-    "PerformanceTiming"
+    "PerformanceTiming",
+    "Worker",
+    "MessageEvent",
+    "DedicatedWorkerGlobalScope",
+    "WorkerGlobalScope",
+    "WorkerOptions"
 ] }
 serde-wasm-bindgen = "0.5"
 js-sys = "0.3"
-rayon = "1.8"
-rand = "0.8"
+base64 = "0.21"
+getrandom = { version = "0.2", features = ["js"] }
+futures = "0.3"
 
-# 仅在非 WASM 目标使用的依赖
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { version = "1.0", features = ["full", "sync", "time", "macros", "rt-multi-thread"] }
 reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+rayon = "1.8"
+rand = "0.8"
 
-# WASM 相关依赖
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1"
-getrandom = { version = "0.2", features = ["js"] }
 tracing-wasm = "0.2"
+rand = { version = "0.8", features = ["getrandom"] }
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -69,4 +75,7 @@ codegen-units = 1
 
 [profile.dev]
 opt-level = 0
-debug = true 
+debug = true
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O4']
