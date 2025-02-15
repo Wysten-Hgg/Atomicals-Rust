@@ -29,7 +29,7 @@ pub async fn mint_ft<W: WalletProvider>(
     let address_str = wallet.get_address().await?;
     let address = Address::from_str(&address_str)
         .map_err(|e| Error::AddressError(e.to_string()))?
-        .require_network(Network::Bitcoin)
+        .require_network(Network::Testnet)
         .map_err(|e| Error::NetworkError(e.to_string()))?;
 
     // Create commit transaction

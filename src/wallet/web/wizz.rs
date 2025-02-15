@@ -8,7 +8,18 @@ use js_sys::{Function, Object, Promise, Reflect, Array};
 use serde_wasm_bindgen::{to_value, from_value};
 use std::str::FromStr;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
-use web_sys::window;
+use web_sys::{window, console};
+use wasm_bindgen_futures::JsFuture;
+
+#[cfg(target_arch = "wasm32")]
+macro_rules! log {
+    ($($t:tt)*) => (web_sys::console::log_1(&format!($($t)*).into()))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+macro_rules! log {
+    ($($t:tt)*) => (log::info!($($t)*))
+}
 
 #[wasm_bindgen]
 #[derive(Debug)]
@@ -64,27 +75,47 @@ impl WalletProvider for WizzProvider {
     }
 
     async fn get_address(&self) -> Result<String> {
-        // 尝试从 accounts 获取地址
-        let accounts = self.call_wallet_method("accounts", &[])?;
-        let accounts_array: Array = accounts.unchecked_into();
-        
-        if accounts_array.length() == 0 {
-            // 如果没有账户，尝试连接
-            let new_accounts = self.call_wallet_method("requestAccounts", &[])?;
-            let new_accounts_array: Array = new_accounts.unchecked_into();
+        // 先检查钱包是否已连接
+        let is_connected = Reflect::get(&self.wallet, &JsValue::from_str("isConnected"))
+            .map_err(|_| Error::WalletError("Failed to check wallet connection".to_string()))?;
             
-            if new_accounts_array.length() == 0 {
-                return Err(Error::WalletError("No accounts available".to_string()));
+        if !is_connected.is_truthy() {
+            // 如果未连接，先尝试连接
+            let connect_result = self.call_wallet_method("connect", &[])?;
+            if !connect_result.is_undefined() {
+                // 等待连接完成
+                if let Ok(promise) = JsFuture::from(connect_result.unchecked_into::<Promise>()).await {
+                    log!("Wallet connected successfully");
+                }
             }
-            
-            let account = new_accounts_array.get(0);
-            from_value(account)
-                .map_err(|e| Error::WalletError(format!("Failed to get address: {}", e)))
-        } else {
-            let account = accounts_array.get(0);
-            from_value(account)
-                .map_err(|e| Error::WalletError(format!("Failed to get address: {}", e)))
         }
+
+        // 请求账户
+        let request_result = self.call_wallet_method("requestAccounts", &[])?;
+        if !request_result.is_undefined() {
+            // 等待请求完成
+            if let Ok(accounts) = JsFuture::from(request_result.unchecked_into::<Promise>()).await {
+                if js_sys::Array::is_array(&accounts) {
+                    let accounts_array: js_sys::Array = accounts.unchecked_into();
+                    if accounts_array.length() > 0 {
+                        let account = accounts_array.get(0);
+                        return from_value(account)
+                            .map_err(|e| Error::WalletError(format!("Failed to parse address: {}", e)));
+                    }
+                }
+            }
+        }
+
+        // 如果上述方法都失败，尝试直接获取 selectedAddress
+        let selected_address = Reflect::get(&self.wallet, &JsValue::from_str("selectedAddress"))
+            .map_err(|_| Error::WalletError("Failed to get selected address".to_string()))?;
+            
+        if !selected_address.is_undefined() {
+            return from_value(selected_address)
+                .map_err(|e| Error::WalletError(format!("Failed to parse address: {}", e)));
+        }
+
+        Err(Error::WalletError("No accounts available".to_string()))
     }
 
     async fn sign_transaction(&self, tx: Transaction, outputs: &[TxOut]) -> Result<Transaction> {
