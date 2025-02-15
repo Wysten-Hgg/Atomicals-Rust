@@ -1,0 +1,19 @@
+{
+  "name": "atomicals-rs",
+  "type": "module",
+  "collaborators": [
+    "Your Name <your.email@example.com>"
+  ],
+  "description": "A Rust implementation of Atomicals protocol",
+  "version": "0.1.0",
+  "files": [
+    "atomicals_rs_bg.wasm",
+    "atomicals_rs.js",
+    "atomicals_rs.d.ts"
+  ],
+  "main": "atomicals_rs.js",
+  "types": "atomicals_rs.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
