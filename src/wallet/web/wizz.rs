@@ -1,7 +1,7 @@
 use crate::errors::{Error, Result};
 use crate::wallet::{WalletProvider, Utxo};
 use async_trait::async_trait;
-use bitcoin::{Transaction, TxOut, Network, PublicKey, Amount, OutPoint, Psbt};
+use bitcoin::{Transaction, TxOut, Network, PublicKey, Amount, OutPoint, Psbt, Address};
 use wasm_bindgen::prelude::*;
 use js_sys::{Function, Object, Promise, Reflect, Array};
 use serde_wasm_bindgen::{to_value, from_value};
@@ -9,6 +9,52 @@ use std::str::FromStr;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use web_sys::{window, console};
 use wasm_bindgen_futures::JsFuture;
+use serde::{Deserialize, Serialize};
+use reqwest;
+use serde_json::Value;
+use bitcoin::hashes::{sha256, Hash};
+
+#[derive(Debug, Deserialize)]
+struct UtxoResponse {
+    success: bool,
+    response: ResponseData,
+    cache: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct ResponseData {
+    atomicals: Value,
+    global: GlobalInfo,
+    utxos: Vec<UtxoItem>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GlobalInfo {
+    atomical_count: u32,
+    height: u32,
+    network: String,
+    server_time: String,
+    #[serde(flatten)]
+    other: Value,
+}
+
+#[derive(Debug, Deserialize)]
+struct UtxoItem {
+    height: u32,
+    txid: String,
+    value: u64,
+    vout: u32,
+    index: u32,
+    #[serde(default)]
+    atomicals: Value,
+}
+
+#[wasm_bindgen]
+#[derive(Debug)]
+pub struct WizzProvider {
+    wallet: Object,
+    account: Option<String>,
+}
 
 #[cfg(target_arch = "wasm32")]
 macro_rules! log {
@@ -18,13 +64,6 @@ macro_rules! log {
 #[cfg(not(target_arch = "wasm32"))]
 macro_rules! log {
     ($($t:tt)*) => (log::info!($($t)*))
-}
-
-#[wasm_bindgen]
-#[derive(Debug)]
-pub struct WizzProvider {
-    wallet: Object,
-    account: Option<String>,
 }
 
 #[wasm_bindgen]
@@ -74,14 +113,26 @@ impl WalletProvider for WizzProvider {
     }
 
     async fn get_address(&self) -> Result<String> {
+        log!("Getting wallet address");
+        
         // 先检查钱包是否已连接
         let is_connected = Reflect::get(&self.wallet, &JsValue::from_str("isConnected"))
-            .map_err(|_| Error::WalletError("Failed to check wallet connection".to_string()))?;
+            .map_err(|e| {
+                log!("Failed to check wallet connection: {:?}", e);
+                Error::WalletError("Failed to check wallet connection".to_string())
+            })?;
+            
+        log!("Wallet connection status: {}", is_connected.is_truthy());
             
         if !is_connected.is_truthy() {
+            log!("Wallet not connected, attempting to connect");
             // 如果未连接，先尝试连接
             let connect_result = self.call_wallet_method("connect", &[])?;
+            
+            log!("Connect method called, result type: {:?}", connect_result.js_typeof());
+            
             if !connect_result.is_undefined() {
+                log!("Waiting for connect promise to resolve");
                 // 等待连接完成
                 if let Ok(promise) = JsFuture::from(connect_result.unchecked_into::<Promise>()).await {
                     log!("Wallet connected successfully");
@@ -89,84 +140,119 @@ impl WalletProvider for WizzProvider {
             }
         }
 
+        log!("Requesting accounts");
         // 请求账户
         let request_result = self.call_wallet_method("requestAccounts", &[])?;
+        
+        log!("Request accounts result type: {:?}", request_result.js_typeof());
+        
         if !request_result.is_undefined() {
+            log!("Waiting for requestAccounts promise to resolve");
             // 等待请求完成
             if let Ok(accounts) = JsFuture::from(request_result.unchecked_into::<Promise>()).await {
+                log!("Accounts received, checking array");
                 if js_sys::Array::is_array(&accounts) {
                     let accounts_array: js_sys::Array = accounts.unchecked_into();
+                    log!("Found {} accounts", accounts_array.length());
                     if accounts_array.length() > 0 {
                         let account = accounts_array.get(0);
                         return from_value(account)
-                            .map_err(|e| Error::WalletError(format!("Failed to parse address: {}", e)));
+                            .map_err(|e| {
+                                log!("Failed to parse account: {:?}", e);
+                                Error::WalletError("Failed to parse account".to_string())
+                            });
                     }
                 }
             }
         }
-
-        // 如果上述方法都失败，尝试直接获取 selectedAddress
-        let selected_address = Reflect::get(&self.wallet, &JsValue::from_str("selectedAddress"))
-            .map_err(|_| Error::WalletError("Failed to get selected address".to_string()))?;
-            
-        if !selected_address.is_undefined() {
-            return from_value(selected_address)
-                .map_err(|e| Error::WalletError(format!("Failed to parse address: {}", e)));
-        }
-
+        
+        log!("No accounts found");
         Err(Error::WalletError("No accounts available".to_string()))
     }
 
     async fn get_utxos(&self) -> Result<Vec<Utxo>> {
-        // 调用钱包的 getUtxos 方法
-        let result = self.call_wallet_method("getUtxos", &[])?;
+        log!("Getting UTXOs");
         
-        // 等待 Promise 完成
-        let utxos_js = JsFuture::from(result.unchecked_into::<Promise>()).await
-            .map_err(|e| Error::WalletError(format!("Failed to get UTXOs: {:?}", e)))?;
-            
-        let utxos_array: Array = utxos_js.unchecked_into();
-        let mut utxos = Vec::new();
+        // 先确保钱包已连接并获取地址
+        let address = self.get_address().await?;
+        log!("Got address: {}", address);
         
-        for i in 0..utxos_array.length() {
-            let utxo_js = utxos_array.get(i);
-            let utxo_obj: Object = utxo_js.unchecked_into();
+        // 获取 scripthash
+        let addr = Address::from_str(&address)
+            .map_err(|e| Error::AddressError(format!("Invalid address: {}", e)))?
+            .require_network(Network::Testnet)
+            .map_err(|e| Error::AddressError(format!("Invalid network: {}", e)))?;
             
-            // 获取 UTXO 的各个字段
-            let txid = Reflect::get(&utxo_obj, &JsValue::from_str("txid"))?;
-            let vout = Reflect::get(&utxo_obj, &JsValue::from_str("vout"))?;
-            let value = Reflect::get(&utxo_obj, &JsValue::from_str("value"))?;
-            let script_pubkey = Reflect::get(&utxo_obj, &JsValue::from_str("scriptPubKey"))?;
-            let height = Reflect::get(&utxo_obj, &JsValue::from_str("height"))?;
+        let script_pubkey = addr.script_pubkey();
+        
+        // 计算 scripthash
+        let script_bytes = script_pubkey.as_bytes();
+        let hash = sha256::Hash::hash(script_bytes);
+        
+        // 反转字节序并转换为十六进制字符串
+        let scripthash = hash.to_byte_array()
+            .iter()
+            .rev()
+            .map(|b| format!("{:02x}", b))
+            .collect::<String>();
+        
+        log!("Calculated scripthash: {}", scripthash);
+        
+        // 构建 API URL
+        let api_url = format!(
+            "https://eptestnet4.wizz.cash/proxy/blockchain.atomicals.listscripthash?params=[\"{}\",true]",
+            scripthash
+        );
+        
+        log!("Fetching UTXOs from API: {}", api_url);
+        
+        // 发起 HTTP 请求
+        let response = reqwest::get(&api_url).await
+            .map_err(|e| Error::NetworkError(format!("Failed to fetch UTXOs: {}", e)))?;
             
-            // 转换数据类型
-            let txid: String = from_value(txid)?;
-            let vout: u32 = from_value(vout)?;
-            let value: u64 = from_value(value)?;
-            let script_pubkey: String = from_value(script_pubkey)?;
-            let height: Option<u32> = from_value(height).ok();
+        let utxo_response: UtxoResponse = response.json().await
+            .map_err(|e| Error::DeserializationError(format!("Failed to parse UTXO response: {}", e)))?;
             
-            // 创建 OutPoint
-            let outpoint = OutPoint::new(
-                bitcoin::Txid::from_str(&txid)
-                    .map_err(|e| Error::WalletError(format!("Invalid txid: {}", e)))?,
-                vout,
-            );
-            
-            // 创建 TxOut
-            let txout = TxOut {
-                value: Amount::from_sat(value),
-                script_pubkey: bitcoin::ScriptBuf::from_hex(&script_pubkey)
-                    .map_err(|e| Error::WalletError(format!("Invalid script: {}", e)))?,
-            };
-            
-            utxos.push(Utxo {
-                outpoint,
-                txout,
-                height,
-            });
+        if !utxo_response.success {
+            return Err(Error::NetworkError("UTXO API request failed".into()));
         }
         
+        let total_utxos = utxo_response.response.utxos.len();
+        
+        // 过滤出 atomicals 为空的 UTXO
+        let filtered_utxos: Vec<UtxoItem> = utxo_response.response.utxos.into_iter()
+            .filter(|utxo| utxo.atomicals.as_object().map_or(true, |obj| obj.is_empty()))
+            .collect();
+        
+        let available_utxos = filtered_utxos.len();
+        log!("Found {} total UTXOs, {} available after filtering", 
+            total_utxos,
+            available_utxos
+        );
+        
+        // 转换为 Utxo 结构
+        let utxos = filtered_utxos.into_iter()
+            .map(|item| {
+                let outpoint = OutPoint::new(
+                    bitcoin::Txid::from_str(&item.txid)
+                        .map_err(|e| Error::TransactionError(format!("Invalid txid: {}", e)))?,
+                    item.vout,
+                );
+                
+                let txout = TxOut {
+                    value: Amount::from_sat(item.value),
+                    script_pubkey: script_pubkey.clone(),
+                };
+                
+                Ok(Utxo {
+                    outpoint,
+                    txout,
+                    height: Some(item.height),
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+            
+        log!("Successfully parsed {} available UTXOs", utxos.len());
         Ok(utxos)
     }
 
@@ -238,11 +324,15 @@ impl WalletProvider for WizzProvider {
 
 impl WizzProvider {
     fn call_wallet_method(&self, method: &str, args: &[JsValue]) -> Result<JsValue> {
+        log!("Calling wallet method: {}", method);
+        
         let method_fn = Reflect::get(&self.wallet, &JsValue::from_str(method))
             .map_err(|_| Error::WalletError(format!("Method {} not found", method)))?;
         
+        log!("Method found, is_function: {}", method_fn.is_function());
+        
         if !method_fn.is_function() {
-            // 如果方法不是函数，尝试作为属性获取
+            log!("Method is not a function, returning as property");
             return Ok(method_fn);
         }
 
@@ -252,8 +342,37 @@ impl WizzProvider {
             args_array.push(arg);
         }
         
+        log!("Applying method with {} arguments", args_array.length());
+        
         let this = JsValue::from(self.wallet.clone());
-        method_fn.apply(&this, &args_array)
-            .map_err(|e| Error::WalletError(format!("Failed to call {}: {:?}", method, e)))
+        let result = method_fn.apply(&this, &args_array)
+            .map_err(|e| {
+                log!("Method call failed: {:?}", e);
+                Error::WalletError(format!("Failed to call {}: {:?}", method, e))
+            })?;
+            
+        log!("Method call succeeded, checking if result is Promise");
+        log!("Result type: {:?}", result.js_typeof());
+            
+        // 检查结果是否是 Promise 实例
+        let is_promise = match js_sys::Reflect::get(&result, &JsValue::from_str("then")) {
+            Ok(then) => {
+                let is_fn = then.is_function();
+                log!("Found 'then' method, is_function: {}", is_fn);
+                is_fn
+            },
+            Err(e) => {
+                log!("Error checking 'then' method: {:?}", e);
+                false
+            }
+        };
+            
+        if is_promise {
+            log!("Returning Promise");
+            return Ok(result);
+        }
+        
+        log!("Returning non-Promise result");
+        Ok(result)
     }
 }
