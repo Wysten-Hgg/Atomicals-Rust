@@ -3,9 +3,9 @@ pub mod errors;
 // pub mod interfaces;
 pub mod operations;
 pub mod types;
-pub mod utils;
 pub mod wallet;
 pub mod wasm;
+pub mod utils;
 
 // Re-export commonly used types
 pub use crate::types::{

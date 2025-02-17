@@ -4,6 +4,8 @@ use bitcoin::Transaction;
 pub mod script_builder;
 pub use script_builder::*;
 
+pub mod tx_size;
+
 pub fn validate_ticker(ticker: &str) -> bool {
     // Ticker rules:
     // 1. Length between 1 and 21 characters

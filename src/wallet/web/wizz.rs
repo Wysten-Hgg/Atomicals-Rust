@@ -1,8 +1,7 @@
 use crate::errors::{Error, Result};
-use crate::wallet::WalletProvider;
+use crate::wallet::{WalletProvider, Utxo};
 use async_trait::async_trait;
-use bitcoin::{Transaction, TxOut, Network, PublicKey};
-use bitcoin::psbt::Psbt;
+use bitcoin::{Transaction, TxOut, Network, PublicKey, Amount, OutPoint, Psbt};
 use wasm_bindgen::prelude::*;
 use js_sys::{Function, Object, Promise, Reflect, Array};
 use serde_wasm_bindgen::{to_value, from_value};
@@ -116,6 +115,85 @@ impl WalletProvider for WizzProvider {
         }
 
         Err(Error::WalletError("No accounts available".to_string()))
+    }
+
+    async fn get_utxos(&self) -> Result<Vec<Utxo>> {
+        // 调用钱包的 getUtxos 方法
+        let result = self.call_wallet_method("getUtxos", &[])?;
+        
+        // 等待 Promise 完成
+        let utxos_js = JsFuture::from(result.unchecked_into::<Promise>()).await
+            .map_err(|e| Error::WalletError(format!("Failed to get UTXOs: {:?}", e)))?;
+            
+        let utxos_array: Array = utxos_js.unchecked_into();
+        let mut utxos = Vec::new();
+        
+        for i in 0..utxos_array.length() {
+            let utxo_js = utxos_array.get(i);
+            let utxo_obj: Object = utxo_js.unchecked_into();
+            
+            // 获取 UTXO 的各个字段
+            let txid = Reflect::get(&utxo_obj, &JsValue::from_str("txid"))?;
+            let vout = Reflect::get(&utxo_obj, &JsValue::from_str("vout"))?;
+            let value = Reflect::get(&utxo_obj, &JsValue::from_str("value"))?;
+            let script_pubkey = Reflect::get(&utxo_obj, &JsValue::from_str("scriptPubKey"))?;
+            let height = Reflect::get(&utxo_obj, &JsValue::from_str("height"))?;
+            
+            // 转换数据类型
+            let txid: String = from_value(txid)?;
+            let vout: u32 = from_value(vout)?;
+            let value: u64 = from_value(value)?;
+            let script_pubkey: String = from_value(script_pubkey)?;
+            let height: Option<u32> = from_value(height).ok();
+            
+            // 创建 OutPoint
+            let outpoint = OutPoint::new(
+                bitcoin::Txid::from_str(&txid)
+                    .map_err(|e| Error::WalletError(format!("Invalid txid: {}", e)))?,
+                vout,
+            );
+            
+            // 创建 TxOut
+            let txout = TxOut {
+                value: Amount::from_sat(value),
+                script_pubkey: bitcoin::ScriptBuf::from_hex(&script_pubkey)
+                    .map_err(|e| Error::WalletError(format!("Invalid script: {}", e)))?,
+            };
+            
+            utxos.push(Utxo {
+                outpoint,
+                txout,
+                height,
+            });
+        }
+        
+        Ok(utxos)
+    }
+
+    async fn get_balance(&self) -> Result<Amount> {
+        // 调用钱包的 getBalance 方法
+        let result = self.call_wallet_method("getBalance", &[])?;
+        
+        // 等待 Promise 完成
+        let balance_js = JsFuture::from(result.unchecked_into::<Promise>()).await
+            .map_err(|e| Error::WalletError(format!("Failed to get balance: {:?}", e)))?;
+            
+        // 转换为 satoshis
+        let balance: u64 = from_value(balance_js)?;
+        Ok(Amount::from_sat(balance))
+    }
+
+    async fn get_network_fee_rate(&self) -> Result<f64> {
+        // 调用钱包的 getFeeRate 方法
+        let result = self.call_wallet_method("getFeeRate", &[])?;
+        
+        // 等待 Promise 完成
+        let fee_rate_js = JsFuture::from(result.unchecked_into::<Promise>()).await
+            .map_err(|e| Error::WalletError(format!("Failed to get fee rate: {:?}", e)))?;
+            
+        // 转换为 f64
+        let fee_rate: f64 = from_value(fee_rate_js)?;
+        Ok(fee_rate)
     }
 
     async fn sign_transaction(&self, tx: Transaction, outputs: &[TxOut]) -> Result<Transaction> {
