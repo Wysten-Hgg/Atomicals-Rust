@@ -49,6 +49,22 @@ struct UtxoItem {
     atomicals: Value,
 }
 
+#[derive(Debug, Deserialize)]
+struct MempoolBlock {
+    #[serde(rename = "blockSize")]
+    block_size: f64,
+    #[serde(rename = "blockVSize")]
+    block_vsize: f64,
+    #[serde(rename = "nTx")]
+    n_tx: u32,
+    #[serde(rename = "totalFees")]
+    total_fees: f64,
+    #[serde(rename = "medianFee")]
+    median_fee: f64,
+    #[serde(rename = "feeRange")]
+    fee_range: Vec<f64>,
+}
+
 #[wasm_bindgen]
 #[derive(Debug)]
 pub struct WizzProvider {
@@ -270,15 +286,30 @@ impl WalletProvider for WizzProvider {
     }
 
     async fn get_network_fee_rate(&self) -> Result<f64> {
-        // 调用钱包的 getFeeRate 方法
-        let result = self.call_wallet_method("getFeeRate", &[])?;
+        log!("Getting fee rate from mempool.space API");
         
-        // 等待 Promise 完成
-        let fee_rate_js = JsFuture::from(result.unchecked_into::<Promise>()).await
-            .map_err(|e| Error::WalletError(format!("Failed to get fee rate: {:?}", e)))?;
+        let api_url = "https://mempool.space/testnet4/api/v1/fees/mempool-blocks";
+        
+        // 发起 HTTP 请求
+        let response = reqwest::get(api_url).await
+            .map_err(|e| Error::NetworkError(format!("Failed to fetch fee rate: {}", e)))?;
             
-        // 转换为 f64
-        let fee_rate: f64 = from_value(fee_rate_js)?;
+        let mempool_blocks: Vec<MempoolBlock> = response.json().await
+            .map_err(|e| Error::DeserializationError(format!("Failed to parse fee rate response: {}", e)))?;
+            
+        // 获取第一个区块的费率
+        let fee_rate = mempool_blocks.first()
+            .map(|block| {
+                if block.median_fee == 0.0 {
+                    1.0
+                } else {
+                    block.median_fee
+                }
+            })
+            .unwrap_or(1.0);
+            
+        log!("Got fee rate: {} sat/vB", fee_rate);
+        
         Ok(fee_rate)
     }
 
