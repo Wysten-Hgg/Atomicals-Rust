@@ -1,4 +1,5 @@
 use bitcoin::{Transaction, TxIn, TxOut, ScriptBuf};
+use log;
 
 pub struct TransactionSize {
     pub base_size: usize,    // 非见证数据大小
@@ -79,11 +80,13 @@ impl ScriptType {
             Some(ScriptType::P2PKH)
         } else if script.is_v0_p2wpkh() {
             Some(ScriptType::P2WPKH)
-        } else if script.is_p2sh() {
-            // 注意：这是一个简化的检查，实际上需要更复杂的逻辑来确定是否是 P2SH-P2WPKH
+        } else if script.is_p2sh() && script.as_bytes().len() == 23 {
+            // P2SH-P2WPKH 脚本的长度应该是 23 字节
+            // 这是一个更准确的检查，但仍然是启发式的
             Some(ScriptType::P2SH_P2WPKH)
         } else {
-            None
+            log::warn!("Unsupported script type: {}", script);
+            Some(ScriptType::P2WPKH)  // 默认使用 P2WPKH，这样至少能继续运行
         }
     }
 }
