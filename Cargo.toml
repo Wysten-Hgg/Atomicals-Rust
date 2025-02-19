@@ -16,6 +16,7 @@ tracing = { version = "0.1", features = ["attributes"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "chrono"] }
 tracing-appender = "0.2"
 hex = "0.4"
+sha2 = "0.10"
 num_cpus = "1.15"
 bip39 = "2.0"
 secp256k1 = { version = "0.28", features = ["rand", "global-context"] }
