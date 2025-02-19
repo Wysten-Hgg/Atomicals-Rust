@@ -5,9 +5,9 @@ use bitcoin::Transaction;
 use bitcoin::transaction::Version;
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
-use js_sys::Promise;
+use js_sys::{Promise, Array, Object, Reflect};
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{Worker, MessageEvent};
+use web_sys::{Worker, MessageEvent, Event};
 use std::cell::RefCell;
 use std::rc::Rc;
 use serde_wasm_bindgen;
@@ -95,35 +95,70 @@ fn create_worker(
     bitwork_info: &BitworkInfo,
     shared_result: Rc<RefCell<MiningResult>>,
 ) -> Result<Worker> {
+    log!("Creating worker for nonce range: {} to {}", start_nonce, end_nonce);
+    
+    // 获取当前脚本的位置
+    let location = web_sys::window()
+        .ok_or_else(|| Error::WorkerError("Failed to get window".into()))?
+        .location();
+    
+    let origin = location.origin()
+        .map_err(|_| Error::WorkerError("Failed to get origin".into()))?;
+    
+    // 构建完整的 Worker 脚本路径
+    let worker_url = format!("{}/worker_entry.js", origin);
+    log!("Worker script URL: {}", worker_url);
+    
     // 创建Worker
-    let worker = Worker::new("./pkg/mining_worker.js")
+    let worker = Worker::new(&worker_url)
         .map_err(|e| Error::WorkerError(format!("Failed to create worker: {:?}", e)))?;
     
     // 设置消息处理器
     let worker_result = shared_result.clone();
     let onmessage_callback = Closure::wrap(Box::new(move |e: MessageEvent| {
-        if let Ok(result) = serde_wasm_bindgen::from_value::<MiningResult>(e.data()) {
-            if result.success {
-                let mut current_result = worker_result.borrow_mut();
-                *current_result = result;
+        match serde_wasm_bindgen::from_value::<MiningResult>(e.data()) {
+            Ok(result) => {
+                log!("Worker received result: success={}, nonce={:?}", result.success, result.nonce);
+                if result.success {
+                    let mut current_result = worker_result.borrow_mut();
+                    *current_result = result;
+                }
+            }
+            Err(e) => {
+                log!("Worker message deserialization error: {}", e);
             }
         }
     }) as Box<dyn FnMut(MessageEvent)>);
-    
+
+    // 设置错误处理器
+    let worker_clone = worker.clone();
+    let onerror_callback = Closure::wrap(Box::new(move |e: Event| {
+        log!("Worker error occurred, terminating worker");
+        worker_clone.terminate();
+    }) as Box<dyn FnMut(Event)>);
+
     worker.set_onmessage(Some(onmessage_callback.as_ref().unchecked_ref()));
+    worker.set_onerror(Some(onerror_callback.as_ref().unchecked_ref()));
     onmessage_callback.forget();
+    onerror_callback.forget();
+    
+    // 准备发送到 Worker 的数据
+    let mut task_obj = Object::new();
+    
+    // 使用 serde_wasm_bindgen 序列化数据
+    let tx_value = serde_wasm_bindgen::to_value(tx_wrapper)
+        .map_err(|e| Error::SerializationError(format!("Failed to serialize tx_wrapper: {}", e)))?;
+    
+    Reflect::set(&task_obj, &"tx_wrapper".into(), &tx_value)?;
+    Reflect::set(&task_obj, &"start_nonce".into(), &JsValue::from(start_nonce))?;
+    Reflect::set(&task_obj, &"end_nonce".into(), &JsValue::from(end_nonce))?;
+    Reflect::set(&task_obj, &"bitwork".into(), &JsValue::from(&bitwork_info.prefix))?;
     
     // 发送任务到Worker
-    let task = serde_wasm_bindgen::to_value(&serde_json::json!({
-        "tx_wrapper": tx_wrapper,
-        "start_nonce": start_nonce,
-        "end_nonce": end_nonce,
-        "bitwork": bitwork_info.prefix,
-    })).map_err(|e| Error::SerializationError(e.to_string()))?;
-    
-    worker.post_message(&task)
+    worker.post_message(&task_obj)
         .map_err(|e| Error::WorkerError(format!("Failed to post message: {:?}", e)))?;
     
+    log!("Worker initialized successfully");
     Ok(worker)
 }
 
@@ -165,7 +200,7 @@ pub async fn mine_transaction(
     
     // 等待结果
     let promise = Promise::new(&mut |resolve, _reject| {
-        let timeout_ms = 30000; // 30 seconds
+        let timeout_ms = 300000; // 5 minutes
         web_sys::window()
             .unwrap()
             .set_timeout_with_callback_and_timeout_and_arguments_0(

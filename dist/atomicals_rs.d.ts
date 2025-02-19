@@ -78,8 +78,8 @@ export interface InitOutput {
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __externref_table_dealloc: (a: number) => void;
   readonly closure5_externref_shim: (a: number, b: number, c: any) => void;
-  readonly closure217_externref_shim: (a: number, b: number, c: any) => void;
-  readonly closure277_externref_shim: (a: number, b: number, c: any, d: any) => void;
+  readonly closure223_externref_shim: (a: number, b: number, c: any) => void;
+  readonly closure282_externref_shim: (a: number, b: number, c: any, d: any) => void;
   readonly __wbindgen_start: () => void;
 }
 

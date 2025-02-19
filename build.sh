@@ -20,8 +20,12 @@ wasm-pack build --target web --verbose
 
 echo "delete files"
 rm -rf dist/atomicals*
+rm -rf dist/mining_worker.js
+rm -rf dist/worker_entry.js
+
 echo "Copying files to dist directory..."
 cp -r pkg/* dist/
+cp src/worker_entry.js dist/
 # cp examples/index.html dist/
 
 echo "Build completed successfully!"
