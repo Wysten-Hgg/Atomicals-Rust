@@ -1,13 +1,35 @@
 /* tslint:disable */
 /* eslint-disable */
+export function mine_nonce_range(tx_wrapper: WasmTransaction, start_nonce: number, end_nonce: number, bitwork: string): number | undefined;
+export function mine_transaction(tx_wrapper: WasmTransaction, bitwork_wrapper: WasmBitworkInfo, options: MiningOptions): Promise<any>;
 export class AtomicalsWasm {
   free(): void;
   constructor();
   mint_ft(tick: string, mint_amount: bigint, bitwork_c?: string | null, bitwork_r?: string | null, num_workers?: number | null, batch_size?: number | null): Promise<any>;
 }
+export class MiningOptions {
+  free(): void;
+  constructor();
+  num_workers: number;
+  batch_size: number;
+}
 export class UnisatProvider {
   free(): void;
   constructor();
+}
+export class WasmBitworkInfo {
+  free(): void;
+  constructor(difficulty: string, prefix: string);
+  get_difficulty(): string;
+  get_prefix(): string;
+  get_ext(): string | undefined;
+  set_ext(ext?: string | null): void;
+}
+export class WasmTransaction {
+  free(): void;
+  constructor(hex: string);
+  to_hex(): string;
+  static from_hex(hex: string): WasmTransaction;
 }
 export class WizzProvider {
   free(): void;
@@ -18,6 +40,23 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
+  readonly __wbg_miningoptions_free: (a: number, b: number) => void;
+  readonly __wbg_get_miningoptions_num_workers: (a: number) => number;
+  readonly __wbg_set_miningoptions_num_workers: (a: number, b: number) => void;
+  readonly __wbg_get_miningoptions_batch_size: (a: number) => number;
+  readonly __wbg_set_miningoptions_batch_size: (a: number, b: number) => void;
+  readonly miningoptions_new: () => number;
+  readonly mine_nonce_range: (a: number, b: number, c: number, d: number, e: number) => number;
+  readonly mine_transaction: (a: number, b: number, c: number) => any;
+  readonly __wbg_wasmtransaction_free: (a: number, b: number) => void;
+  readonly wasmtransaction_to_hex: (a: number) => [number, number];
+  readonly wasmtransaction_from_hex: (a: number, b: number) => number;
+  readonly __wbg_wasmbitworkinfo_free: (a: number, b: number) => void;
+  readonly wasmbitworkinfo_new: (a: number, b: number, c: number, d: number) => number;
+  readonly wasmbitworkinfo_get_difficulty: (a: number) => [number, number];
+  readonly wasmbitworkinfo_get_prefix: (a: number) => [number, number];
+  readonly wasmbitworkinfo_get_ext: (a: number) => [number, number];
+  readonly wasmbitworkinfo_set_ext: (a: number, b: number, c: number) => void;
   readonly __wbg_unisatprovider_free: (a: number, b: number) => void;
   readonly unisatprovider_try_new: () => [number, number, number];
   readonly __wbg_wizzprovider_free: (a: number, b: number) => void;
@@ -25,6 +64,7 @@ export interface InitOutput {
   readonly __wbg_atomicalswasm_free: (a: number, b: number) => void;
   readonly atomicalswasm_try_new: () => [number, number, number];
   readonly atomicalswasm_mint_ft: (a: number, b: number, c: number, d: bigint, e: number, f: number, g: number, h: number, i: number, j: number) => any;
+  readonly wasmtransaction_new: (a: number, b: number) => number;
   readonly rustsecp256k1_v0_9_2_context_create: (a: number) => number;
   readonly rustsecp256k1_v0_9_2_context_destroy: (a: number) => void;
   readonly rustsecp256k1_v0_9_2_default_illegal_callback_fn: (a: number, b: number) => void;
@@ -35,9 +75,11 @@ export interface InitOutput {
   readonly __externref_table_alloc: () => number;
   readonly __wbindgen_export_4: WebAssembly.Table;
   readonly __wbindgen_export_5: WebAssembly.Table;
+  readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __externref_table_dealloc: (a: number) => void;
-  readonly closure199_externref_shim: (a: number, b: number, c: any) => void;
-  readonly closure261_externref_shim: (a: number, b: number, c: any, d: any) => void;
+  readonly closure5_externref_shim: (a: number, b: number, c: any) => void;
+  readonly closure217_externref_shim: (a: number, b: number, c: any) => void;
+  readonly closure277_externref_shim: (a: number, b: number, c: any, d: any) => void;
   readonly __wbindgen_start: () => void;
 }
 

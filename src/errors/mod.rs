@@ -24,6 +24,10 @@ pub enum Error {
     SerdeError(serde_wasm_bindgen::Error),
     HexError(String),
     SerdeJsonError(serde_json::Error),
+    AsyncError(String),
+    InvalidInput(String),
+    DatabaseError(String),
+    Other(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -48,6 +52,10 @@ impl fmt::Display for Error {
             Error::SerdeError(e) => write!(f, "Serde error: {}", e),
             Error::HexError(e) => write!(f, "Hex error: {}", e),
             Error::SerdeJsonError(e) => write!(f, "JSON error: {}", e),
+            Error::AsyncError(msg) => write!(f, "Async error: {}", msg),
+            Error::InvalidInput(msg) => write!(f, "Invalid input: {}", msg),
+            Error::DatabaseError(msg) => write!(f, "Database error: {}", msg),
+            Error::Other(msg) => write!(f, "Other error: {}", msg),
         }
     }
 }

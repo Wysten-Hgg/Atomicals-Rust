@@ -10,7 +10,12 @@ pub mod utils;
 // Re-export commonly used types
 pub use crate::types::{
     Amount, Arc20Config, Arc20Token, AtomicalsTx,
-    mint::BitworkInfo, mint::MintConfig, mint::MintResult
+    mint::BitworkInfo, mint::MintConfig, mint::MintResult,
+    wasm::{WasmTransaction, WasmBitworkInfo},
+};
+
+pub use crate::operations::mining::{
+    mine_transaction, MiningOptions, MiningResult,
 };
 
 pub use crate::wallet::{

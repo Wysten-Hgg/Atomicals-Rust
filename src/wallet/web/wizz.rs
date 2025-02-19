@@ -18,6 +18,7 @@ use bitcoin::hashes::{sha256, Hash};
 struct UtxoResponse {
     success: bool,
     response: ResponseData,
+    #[serde(default)]
     cache: bool,
 }
 
@@ -226,7 +227,12 @@ impl WalletProvider for WizzProvider {
         let response = reqwest::get(&api_url).await
             .map_err(|e| Error::NetworkError(format!("Failed to fetch UTXOs: {}", e)))?;
             
-        let utxo_response: UtxoResponse = response.json().await
+        let response_text = response.text().await
+            .map_err(|e| Error::NetworkError(format!("Failed to get response text: {}", e)))?;
+            
+        log!("API Response: {}", response_text);
+        
+        let utxo_response: UtxoResponse = serde_json::from_str(&response_text)
             .map_err(|e| Error::DeserializationError(format!("Failed to parse UTXO response: {}", e)))?;
             
         if !utxo_response.success {

@@ -1,14 +1,18 @@
-use crate::operations::mining::{mine_transaction, MiningOptions};
-use crate::types::{AtomicalsTx, Arc20Config, mint::BitworkInfo};
+use crate::types::{AtomicalsTx, arc20::{Arc20Config, Arc20Token}};
+use crate::types::mint::{BitworkInfo, MintConfig, MintResult};
 use crate::errors::{Error, Result};
 use crate::wallet::{WalletProvider, Utxo};
+use crate::types::wasm::{WasmTransaction, WasmBitworkInfo};
+use crate::operations::mining::{mine_transaction, MiningOptions, MiningResult};
 use crate::utils::tx_size::{self, ScriptType};
-use bitcoin::{Amount, Network, Transaction, TxIn, TxOut, Sequence};
-use bitcoin::transaction::Version;
-use bitcoin::address::Address;
-use bitcoin::psbt::Psbt;
-use bitcoin::ScriptBuf;
+use bitcoin::{
+    Amount, Network, Transaction, TxIn, TxOut, Sequence,
+    psbt::Psbt, ScriptBuf, Address,
+    transaction::Version,
+};
 use std::str::FromStr;
+use wasm_bindgen::prelude::*;
+use serde_wasm_bindgen;
 
 #[cfg(target_arch = "wasm32")]
 macro_rules! log {
@@ -152,8 +156,9 @@ pub async fn mint_ft<W: WalletProvider>(
         output: commit_outputs,
     };
 
-    let mut commit_psbt = Psbt::from_unsigned_tx(commit_tx)
-        .map_err(|e| Error::PsbtError(format!("Failed to create commit PSBT: {}", e)))?;
+    let mut commit_psbt = Psbt::from_unsigned_tx(commit_tx.clone())
+    .map_err(|e| Error::PsbtError(format!("Failed to create commit PSBT: {}", e)))?;
+
         
     // 添加输入的 UTXO 信息到 PSBT
     for (i, utxo) in selected_utxos.iter().enumerate() {
@@ -175,26 +180,27 @@ pub async fn mint_ft<W: WalletProvider>(
         ],
     };
 
-    let mut reveal_psbt = Psbt::from_unsigned_tx(reveal_tx)
-        .map_err(|e| Error::PsbtError(format!("Failed to create reveal PSBT: {}", e)))?;
+   let mut reveal_psbt = Psbt::from_unsigned_tx(reveal_tx.clone())
+    .map_err(|e| Error::PsbtError(format!("Failed to create reveal PSBT: {}", e)))?;
     log!("Created reveal PSBT");
 
     // Mine transactions if needed
     if let Some(ref mining_opts) = mining_options {
         if let Some(ref bitworkc) = config.mint_bitworkc {
             log!("Mining commit transaction...");
-            let commit_tx = commit_psbt.extract_tx()
-                .map_err(|e| Error::TransactionError(format!("Failed to extract commit tx for mining: {}", e)))?;
             let mining_result = mine_transaction(
-                commit_tx,
-                BitworkInfo::new(bitworkc.clone()),
-                mining_opts.clone(),
+                WasmTransaction::from_transaction(&commit_tx),
+                WasmBitworkInfo::from_bitwork_info(&BitworkInfo::new(bitworkc.clone())),
+                MiningOptions::new(),
             ).await?;
-            
-            if let Some(mined_tx) = mining_result.tx {
-                commit_psbt = Psbt::from_unsigned_tx(mined_tx)
-                    .map_err(|e| Error::PsbtError(format!("Failed to create PSBT after mining commit tx: {}", e)))?;
-                log!("Commit transaction mined successfully");
+
+            let mining_result: MiningResult = serde_wasm_bindgen::from_value(mining_result)?;
+            if mining_result.success {
+                if let Some(mined_tx) = mining_result.get_transaction() {
+                    commit_psbt = Psbt::from_unsigned_tx(mined_tx)
+                        .map_err(|e| Error::PsbtError(format!("Failed to create PSBT after mining commit tx: {}", e)))?;
+                    log!("Commit transaction mined successfully");
+                }
             } else {
                 return Err(Error::MiningError("Failed to mine commit transaction".into()));
             }
@@ -202,18 +208,19 @@ pub async fn mint_ft<W: WalletProvider>(
 
         if let Some(ref bitworkr) = config.mint_bitworkr {
             log!("Mining reveal transaction...");
-            let reveal_tx = reveal_psbt.extract_tx()
-                .map_err(|e| Error::TransactionError(format!("Failed to extract reveal tx for mining: {}", e)))?;
             let mining_result = mine_transaction(
-                reveal_tx,
-                BitworkInfo::new(bitworkr.clone()),
-                mining_opts.clone(),
+                WasmTransaction::from_transaction(&reveal_tx),
+                WasmBitworkInfo::from_bitwork_info(&BitworkInfo::new(bitworkr.clone())),
+                MiningOptions::new(),
             ).await?;
-            
-            if let Some(mined_tx) = mining_result.tx {
-                reveal_psbt = Psbt::from_unsigned_tx(mined_tx)
-                    .map_err(|e| Error::PsbtError(format!("Failed to create PSBT after mining reveal tx: {}", e)))?;
-                log!("Reveal transaction mined successfully");
+
+            let mining_result: MiningResult = serde_wasm_bindgen::from_value(mining_result)?;
+            if mining_result.success {
+                if let Some(mined_tx) = mining_result.get_transaction() {
+                    reveal_psbt = Psbt::from_unsigned_tx(mined_tx)
+                        .map_err(|e| Error::PsbtError(format!("Failed to create PSBT after mining reveal tx: {}", e)))?;
+                    log!("Reveal transaction mined successfully");
+                }
             } else {
                 return Err(Error::MiningError("Failed to mine reveal transaction".into()));
             }

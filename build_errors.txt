@@ -1,11 +1,24 @@
+warning: unused manifest key: profile.release.wasm-opt
     Checking atomicals-rs v0.1.0 (/mnt/d/atom/atomicalsR)
-warning: unused import: `wasm_bindgen::JsCast`
-  --> src/operations/mining.rs:10:5
+warning: unused import: `Arc20Token`
+ --> src/operations/mint_ft.rs:1:54
+  |
+1 | use crate::types::{AtomicalsTx, arc20::{Arc20Config, Arc20Token}};
+  |                                                      ^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused imports: `MintConfig` and `MintResult`
+ --> src/operations/mint_ft.rs:2:39
+  |
+2 | use crate::types::mint::{BitworkInfo, MintConfig, MintResult};
+  |                                       ^^^^^^^^^^  ^^^^^^^^^^
+
+warning: unused import: `wasm_bindgen::prelude::*`
+  --> src/operations/mint_ft.rs:14:5
    |
-10 | use wasm_bindgen::JsCast;
-   |     ^^^^^^^^^^^^^^^^^^^^
-   |
-   = note: `#[warn(unused_imports)]` on by default
+14 | use wasm_bindgen::prelude::*;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
 
 warning: unused import: `bitcoin::Script`
  --> src/types/atomicals.rs:3:5
@@ -14,15 +27,15 @@ warning: unused import: `bitcoin::Script`
   |     ^^^^^^^^^^^^^^^
 
 warning: unused import: `bitcoin::Transaction`
-  --> src/types/mod.rs:13:5
+  --> src/types/mod.rs:15:5
    |
-13 | use bitcoin::Transaction;
+15 | use bitcoin::Transaction;
    |     ^^^^^^^^^^^^^^^^^^^^
 
 warning: unused imports: `Deserialize` and `Serialize`
-  --> src/types/mod.rs:14:13
+  --> src/types/mod.rs:16:13
    |
-14 | use serde::{Serialize, Deserialize};
+16 | use serde::{Serialize, Deserialize};
    |             ^^^^^^^^^  ^^^^^^^^^^^
 
 warning: unused import: `Promise`
@@ -62,95 +75,52 @@ warning: unused imports: `Transaction`, `TxIn`, and `TxOut`
   |               ^^^^^^^^^^^  ^^^^  ^^^^^
 
 warning: variant `P2SH_P2WPKH` should have an upper camel case name
-  --> src/utils/tx_size.rs:73:5
+  --> src/utils/tx_size.rs:74:5
    |
-73 |     P2SH_P2WPKH, // Nested SegWit
+74 |     P2SH_P2WPKH, // Nested SegWit
    |     ^^^^^^^^^^^ help: convert the identifier to upper camel case: `P2shP2wpkh`
    |
    = note: `#[warn(non_camel_case_types)]` on by default
 
-warning: unused variable: `worker_stop`
-  --> src/operations/mining.rs:64:13
-   |
-64 |         let worker_stop = stop_mining.clone();
-   |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_worker_stop`
-   |
-   = note: `#[warn(unused_variables)]` on by default
-
-warning: variable does not need to be mutable
-  --> src/operations/mining.rs:67:13
-   |
-67 |         let mut opts = WorkerOptions::new();
-   |             ----^^^^
-   |             |
-   |             help: remove this `mut`
-   |
-   = note: `#[warn(unused_mut)]` on by default
-
-warning: unused variable: `workers`
-   --> src/operations/mining.rs:139:5
+warning: unused variable: `mining_opts`
+   --> src/operations/mint_ft.rs:188:21
     |
-139 |     workers: &[Worker],
-    |     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_workers`
-
-warning: unused variable: `stop_mining`
-   --> src/operations/mining.rs:140:5
+188 |     if let Some(ref mining_opts) = mining_options {
+    |                     ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_mining_opts`
     |
-140 |     stop_mining: &Arc<AtomicBool>,
-    |     ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_stop_mining`
-
-error[E0599]: no variant or associated item named `InsufficientFunds` found for enum `errors::Error` in the current scope
-   --> src/operations/mint_ft.rs:123:39
-    |
-123 |             None => return Err(Error::InsufficientFunds("Not enough funds after fees".into())),
-    |                                       ^^^^^^^^^^^^^^^^^ variant or associated item not found in `Error`
-    |
-   ::: src/errors/mod.rs:9:1
-    |
-9   | pub enum Error {
-    | -------------- variant or associated item `InsufficientFunds` not found for this enum
-
-error[E0599]: no variant or associated item named `InsufficientFunds` found for enum `errors::Error` in the current scope
-   --> src/operations/mint_ft.rs:125:35
-    |
-125 |         None => return Err(Error::InsufficientFunds("Not enough funds to cover fees".into())),
-    |                                   ^^^^^^^^^^^^^^^^^ variant or associated item not found in `Error`
-    |
-   ::: src/errors/mod.rs:9:1
-    |
-9   | pub enum Error {
-    | -------------- variant or associated item `InsufficientFunds` not found for this enum
-
-error[E0599]: no variant or associated item named `InsufficientFunds` found for enum `errors::Error` in the current scope
-  --> src/operations/mint_ft.rs:73:16
-   |
-73 |     Err(Error::InsufficientFunds("Not enough funds to cover amount and fees".into()))
-   |                ^^^^^^^^^^^^^^^^^ variant or associated item not found in `Error`
-   |
-  ::: src/errors/mod.rs:9:1
-   |
-9  | pub enum Error {
-   | -------------- variant or associated item `InsufficientFunds` not found for this enum
+    = note: `#[warn(unused_variables)]` on by default
 
 warning: use of deprecated method `bitcoin::Script::is_v0_p2wpkh`: use is_p2wpkh instead
-  --> src/utils/tx_size.rs:80:26
+  --> src/utils/tx_size.rs:81:26
    |
-80 |         } else if script.is_v0_p2wpkh() {
+81 |         } else if script.is_v0_p2wpkh() {
    |                          ^^^^^^^^^^^^
    |
    = note: `#[warn(deprecated)]` on by default
 
-warning: unused variable: `account_str`
-  --> src/wallet/web/wizz.rs:70:13
+warning: unused import: `Serialize`
+  --> src/wallet/web/wizz.rs:12:26
    |
-70 |         let account_str: String = from_value(account)?;
-   |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_account_str`
+12 | use serde::{Deserialize, Serialize};
+   |                          ^^^^^^^^^
+
+warning: unused variable: `script_type`
+  --> src/operations/mint_ft.rs:47:13
+   |
+47 |         let script_type = ScriptType::from_script(&utxo.txout.script_pubkey)
+   |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_script_type`
+
+warning: unused variable: `account_str`
+   --> src/wallet/web/wizz.rs:125:13
+    |
+125 |         let account_str: String = from_value(account)?;
+    |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_account_str`
 
 warning: unused variable: `promise`
-  --> src/wallet/web/wizz.rs:86:27
-   |
-86 |                 if let Ok(promise) = JsFuture::from(connect_result.unchecked_into::<Promise>()).await {
-   |                           ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_promise`
+   --> src/wallet/web/wizz.rs:153:27
+    |
+153 |                 if let Ok(promise) = JsFuture::from(connect_result.unchecked_into::<Promise>()).await {
+    |                           ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_promise`
 
 warning: unused variable: `commit_psbt`
   --> src/wallet/mod.rs:40:49
@@ -164,6 +134,93 @@ warning: unused variable: `reveal_psbt`
 40 |     async fn sign_atomicals_transactions(&self, commit_psbt: Psbt, reveal_psbt: Psbt) -> Result<(Transaction, Transaction)> {
    |                                                                    ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_reveal_psbt`
 
-For more information about this error, try `rustc --explain E0599`.
-warning: `atomicals-rs` (lib) generated 20 warnings
-error: could not compile `atomicals-rs` (lib) due to 3 previous errors; 20 warnings emitted
+warning: field `cache` is never read
+  --> src/wallet/web/wizz.rs:21:5
+   |
+18 | struct UtxoResponse {
+   |        ------------ field in this struct
+...
+21 |     cache: bool,
+   |     ^^^^^
+   |
+   = note: `UtxoResponse` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` on by default
+
+warning: fields `atomicals` and `global` are never read
+  --> src/wallet/web/wizz.rs:26:5
+   |
+25 | struct ResponseData {
+   |        ------------ fields in this struct
+26 |     atomicals: Value,
+   |     ^^^^^^^^^
+27 |     global: GlobalInfo,
+   |     ^^^^^^
+   |
+   = note: `ResponseData` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `atomical_count`, `height`, `network`, `server_time`, and `other` are never read
+  --> src/wallet/web/wizz.rs:33:5
+   |
+32 | struct GlobalInfo {
+   |        ---------- fields in this struct
+33 |     atomical_count: u32,
+   |     ^^^^^^^^^^^^^^
+34 |     height: u32,
+   |     ^^^^^^
+35 |     network: String,
+   |     ^^^^^^^
+36 |     server_time: String,
+   |     ^^^^^^^^^^^
+37 |     #[serde(flatten)]
+38 |     other: Value,
+   |     ^^^^^
+   |
+   = note: `GlobalInfo` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `index` is never read
+  --> src/wallet/web/wizz.rs:47:5
+   |
+42 | struct UtxoItem {
+   |        -------- field in this struct
+...
+47 |     index: u32,
+   |     ^^^^^
+   |
+   = note: `UtxoItem` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `block_size`, `block_vsize`, `n_tx`, `total_fees`, and `fee_range` are never read
+  --> src/wallet/web/wizz.rs:55:5
+   |
+53 | struct MempoolBlock {
+   |        ------------ fields in this struct
+54 |     #[serde(rename = "blockSize")]
+55 |     block_size: f64,
+   |     ^^^^^^^^^^
+56 |     #[serde(rename = "blockVSize")]
+57 |     block_vsize: f64,
+   |     ^^^^^^^^^^^
+58 |     #[serde(rename = "nTx")]
+59 |     n_tx: u32,
+   |     ^^^^
+60 |     #[serde(rename = "totalFees")]
+61 |     total_fees: f64,
+   |     ^^^^^^^^^^
+...
+65 |     fee_range: Vec<f64>,
+   |     ^^^^^^^^^
+   |
+   = note: `MempoolBlock` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `account` is never read
+  --> src/wallet/web/wizz.rs:72:5
+   |
+70 | pub struct WizzProvider {
+   |            ------------ field in this struct
+71 |     wallet: Object,
+72 |     account: Option<String>,
+   |     ^^^^^^^
+   |
+   = note: `WizzProvider` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: `atomicals-rs` (lib) generated 27 warnings (run `cargo fix --lib -p atomicals-rs` to apply 12 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.03s
