@@ -6,4 +6,3 @@ Cargo.lock
 node_modules
 *.iml
 .DS_Store
-dist
