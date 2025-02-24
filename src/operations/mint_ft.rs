@@ -15,7 +15,10 @@ use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 use serde_wasm_bindgen;
 use serde_cbor;
+use serde::Serialize;
 use crate::utils::script::append_mint_update_reveal_script;
+use crate::utils::script::time_nonce;
+use crate::utils::script::cbor;
 use web_sys;
 use js_sys;
 use wasm_bindgen_futures;
@@ -28,6 +31,17 @@ macro_rules! log {
 #[cfg(not(target_arch = "wasm32"))]
 macro_rules! log {
     ($($t:tt)*) => (log::info!($($t)*))
+}
+#[derive(Debug, Serialize)]
+pub struct PayloadWrapper {
+	pub args: Payload,
+}
+#[derive(Debug, Serialize)]
+pub struct Payload {
+	pub bitworkc: String,
+	pub mint_ticker: String,
+	pub nonce: u64,
+	pub time: u64,
 }
 
 fn select_utxos(utxos: &[Utxo], target_amount: Amount, fee_rate: f64) -> Result<(Vec<Utxo>, Amount)> {
@@ -123,19 +137,25 @@ pub async fn mint_ft<W: WalletProvider>(
     let pubkey = wallet.get_public_key().await?;
     let (xonly_pubkey, _parity) = pubkey.inner.x_only_public_key();
     // 构建atomicals payload
-    let mut payload = std::collections::HashMap::new();
-    let mut token_data = std::collections::HashMap::new();
-    token_data.insert(0u32, config.mint_amount.0);
-    payload.insert(config.tick.clone(), token_data);
-    
-    let payload_cbor = serde_cbor::to_vec(&payload)
-        .map_err(|e| Error::SerializationError(format!("Failed to serialize payload: {}", e)))?;
+    let payload = PayloadWrapper {
+        args: {
+            let (time, nonce) = time_nonce();
+
+            Payload {
+                bitworkc: config.mint_bitworkc.clone().unwrap_or_else(|| "".to_string()),
+                mint_ticker: config.tick.clone(),
+                nonce,
+                time,
+            }
+        },
+    };
+    let payload_encoded = cbor(&payload)?;
     
     // 准备commit-reveal配置
     let (script, script_address) = prepare_commit_reveal_config(
-        "ft",  // op_type for FT
+        "dmt",  // op_type for FT
         &xonly_pubkey,
-        &payload_cbor,
+        &payload_encoded,
         Network::Testnet
     ).await?;
     

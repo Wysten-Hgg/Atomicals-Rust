@@ -1,4 +1,15 @@
 warning: unused manifest key: profile.release.wasm-opt
+    Updating crates.io index
+     Locking 5 packages to latest compatible versions
+      Adding ciborium v0.2.2
+      Adding ciborium-io v0.2.2
+      Adding ciborium-ll v0.2.2
+      Adding crunchy v0.2.3
+      Adding half v2.4.1
+    Checking half v2.4.1
+    Checking ciborium-io v0.2.2
+    Checking ciborium-ll v0.2.2
+    Checking ciborium v0.2.2
     Checking atomicals-rs v0.1.0 (/mnt/d/atom/atomicalsR)
 warning: unused import: `bitcoin::transaction::Version`
  --> src/operations/mining.rs:5:5
@@ -26,17 +37,23 @@ warning: unused imports: `MintConfig` and `MintResult`
 2 | use crate::types::mint::{BitworkInfo, MintConfig, MintResult};
   |                                       ^^^^^^^^^^  ^^^^^^^^^^
 
-warning: unused imports: `LeafVersion` and `TapTree`
+warning: unused import: `TapTree`
   --> src/operations/mint_ft.rs:10:47
    |
 10 |     psbt::Psbt, ScriptBuf, Address, taproot::{TapTree, TaprootBuilder, LeafVersion},
-   |                                               ^^^^^^^                  ^^^^^^^^^^^
+   |                                               ^^^^^^^
 
 warning: unused import: `wasm_bindgen::prelude::*`
   --> src/operations/mint_ft.rs:15:5
    |
 15 | use wasm_bindgen::prelude::*;
    |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `serde_cbor`
+  --> src/operations/mint_ft.rs:17:5
+   |
+17 | use serde_cbor;
+   |     ^^^^^^^^^^
 
 warning: unused import: `bitcoin::Script`
  --> src/types/atomicals.rs:3:5
@@ -61,6 +78,18 @@ warning: unused import: `Promise`
   |
 7 | use js_sys::{Function, Object, Promise, Reflect, Array};
   |                                ^^^^^^^
+
+warning: unused import: `Txid`
+ --> src/wallet/web/wizz.rs:4:88
+  |
+4 | use bitcoin::{Transaction, TxOut, Network, PublicKey, Amount, OutPoint, Psbt, Address, Txid};
+  |                                                                                        ^^^^
+
+warning: unused imports: `Engine as _` and `engine::general_purpose::STANDARD as BASE64`
+ --> src/wallet/web/wizz.rs:9:14
+  |
+9 | use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+  |              ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 warning: unused import: `console`
   --> src/wallet/web/wizz.rs:10:23
@@ -159,17 +188,17 @@ warning: unused variable: `window`
     |                 ^^^^^^ help: if this is intentional, prefix it with an underscore: `_window`
 
 warning: use of deprecated associated function `bitcoin::ScriptBuf::new_v1_p2tr`: use new_p2tr instead
-   --> src/operations/mint_ft.rs:100:32
+   --> src/operations/mint_ft.rs:117:32
     |
-100 |     let tr_script = ScriptBuf::new_v1_p2tr(&secp, *child_node_xonly_pubkey, merkle_root.merkle_root());
+117 |     let tr_script = ScriptBuf::new_v1_p2tr(&secp, *child_node_xonly_pubkey, merkle_root.merkle_root());
     |                                ^^^^^^^^^^^
     |
     = note: `#[warn(deprecated)]` on by default
 
 warning: unused variable: `mining_opts`
-   --> src/operations/mint_ft.rs:266:21
+   --> src/operations/mint_ft.rs:309:21
     |
-266 |     if let Some(ref mining_opts) = mining_options {
+309 |     if let Some(ref mining_opts) = mining_options {
     |                     ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_mining_opts`
 
 warning: use of deprecated method `bitcoin::Script::is_v0_p2wpkh`: use is_p2wpkh instead
@@ -183,6 +212,21 @@ warning: use of deprecated method `bitcoin::Script::is_v1_p2tr`: use is_p2tr ins
     |
 123 |         } else if script.is_v1_p2tr() {
     |                          ^^^^^^^^^^
+
+error[E0277]: `?` couldn't convert the error to `utils::script::Error`
+  --> src/utils/script.rs:70:37
+   |
+64 | pub fn cbor<T>(v: &T) -> Result<Vec<u8>>
+   |                          --------------- expected `utils::script::Error` because of this
+...
+70 |     ciborium::into_writer(v, &mut cbor)?;
+   |     -----------------------------------^ the trait `From<ciborium::ser::Error<std::io::Error>>` is not implemented for `utils::script::Error`, which is required by `std::result::Result<Vec<u8>, utils::script::Error>: FromResidual<std::result::Result<Infallible, ciborium::ser::Error<std::io::Error>>>`
+   |     |
+   |     this can't be annotated with `?` because it has type `Result<_, ciborium::ser::Error<std::io::Error>>`
+   |
+   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+   = help: the trait `FromResidual<std::result::Result<Infallible, E>>` is implemented for `std::result::Result<T, F>`
+   = note: required for `std::result::Result<Vec<u8>, utils::script::Error>` to implement `FromResidual<std::result::Result<Infallible, ciborium::ser::Error<std::io::Error>>>`
 
 warning: unused import: `Serialize`
   --> src/wallet/web/wizz.rs:12:26
@@ -219,15 +263,15 @@ warning: variable does not need to be mutable
     = note: `#[warn(unused_mut)]` on by default
 
 warning: unused variable: `script_type`
-  --> src/operations/mint_ft.rs:50:13
+  --> src/operations/mint_ft.rs:67:13
    |
-50 |         let script_type = ScriptType::from_script(&utxo.txout.script_pubkey)
+67 |         let script_type = ScriptType::from_script(&utxo.txout.script_pubkey)
    |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_script_type`
 
 warning: unused variable: `promise`
-   --> src/wallet/web/wizz.rs:164:27
+   --> src/wallet/web/wizz.rs:165:27
     |
-164 |                 if let Ok(promise) = JsFuture::from(connect_result.unchecked_into::<Promise>()).await {
+165 |                 if let Ok(promise) = JsFuture::from(connect_result.unchecked_into::<Promise>()).await {
     |                           ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_promise`
 
 warning: unused variable: `commit_psbt`
@@ -242,93 +286,6 @@ warning: unused variable: `reveal_psbt`
 40 |     async fn sign_atomicals_transactions(&self, commit_psbt: Psbt, reveal_psbt: Psbt) -> Result<(Transaction, Transaction)> {
    |                                                                    ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_reveal_psbt`
 
-warning: field `cache` is never read
-  --> src/wallet/web/wizz.rs:22:5
-   |
-18 | struct UtxoResponse {
-   |        ------------ field in this struct
-...
-22 |     cache: bool,
-   |     ^^^^^
-   |
-   = note: `UtxoResponse` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
-   = note: `#[warn(dead_code)]` on by default
-
-warning: fields `atomicals` and `global` are never read
-  --> src/wallet/web/wizz.rs:27:5
-   |
-26 | struct ResponseData {
-   |        ------------ fields in this struct
-27 |     atomicals: Value,
-   |     ^^^^^^^^^
-28 |     global: GlobalInfo,
-   |     ^^^^^^
-   |
-   = note: `ResponseData` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
-
-warning: fields `atomical_count`, `height`, `network`, `server_time`, and `other` are never read
-  --> src/wallet/web/wizz.rs:34:5
-   |
-33 | struct GlobalInfo {
-   |        ---------- fields in this struct
-34 |     atomical_count: u32,
-   |     ^^^^^^^^^^^^^^
-35 |     height: u32,
-   |     ^^^^^^
-36 |     network: String,
-   |     ^^^^^^^
-37 |     server_time: String,
-   |     ^^^^^^^^^^^
-38 |     #[serde(flatten)]
-39 |     other: Value,
-   |     ^^^^^
-   |
-   = note: `GlobalInfo` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
-
-warning: field `index` is never read
-  --> src/wallet/web/wizz.rs:48:5
-   |
-43 | struct UtxoItem {
-   |        -------- field in this struct
-...
-48 |     index: u32,
-   |     ^^^^^
-   |
-   = note: `UtxoItem` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
-
-warning: fields `block_size`, `block_vsize`, `n_tx`, `total_fees`, and `fee_range` are never read
-  --> src/wallet/web/wizz.rs:56:5
-   |
-54 | struct MempoolBlock {
-   |        ------------ fields in this struct
-55 |     #[serde(rename = "blockSize")]
-56 |     block_size: f64,
-   |     ^^^^^^^^^^
-57 |     #[serde(rename = "blockVSize")]
-58 |     block_vsize: f64,
-   |     ^^^^^^^^^^^
-59 |     #[serde(rename = "nTx")]
-60 |     n_tx: u32,
-   |     ^^^^
-61 |     #[serde(rename = "totalFees")]
-62 |     total_fees: f64,
-   |     ^^^^^^^^^^
-...
-66 |     fee_range: Vec<f64>,
-   |     ^^^^^^^^^
-   |
-   = note: `MempoolBlock` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
-
-warning: field `account` is never read
-  --> src/wallet/web/wizz.rs:73:5
-   |
-71 | pub struct WizzProvider {
-   |            ------------ field in this struct
-72 |     wallet: Object,
-73 |     account: Option<String>,
-   |     ^^^^^^^
-   |
-   = note: `WizzProvider` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
-
-warning: `atomicals-rs` (lib) generated 40 warnings (run `cargo fix --lib -p atomicals-rs` to apply 18 suggestions)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.70s
+For more information about this error, try `rustc --explain E0277`.
+warning: `atomicals-rs` (lib) generated 37 warnings
+error: could not compile `atomicals-rs` (lib) due to 1 previous error; 37 warnings emitted
