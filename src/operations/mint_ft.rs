@@ -7,12 +7,15 @@ use crate::operations::mining::{mine_transaction, MiningOptions, MiningResult};
 use crate::utils::tx_size::{self, ScriptType};
 use bitcoin::{
     Amount, Network, Transaction, TxIn, TxOut, Sequence,
-    psbt::Psbt, ScriptBuf, Address,
-    transaction::Version,
+    psbt::Psbt, ScriptBuf, Address, taproot::{TapTree, TaprootBuilder, LeafVersion},
+    transaction::Version, key::XOnlyPublicKey, secp256k1::Secp256k1,
+    OutPoint, // <--- Added OutPoint import
 };
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 use serde_wasm_bindgen;
+use serde_cbor;
+use crate::utils::script::append_mint_update_reveal_script;
 
 #[cfg(target_arch = "wasm32")]
 macro_rules! log {
@@ -77,6 +80,29 @@ fn select_utxos(utxos: &[Utxo], target_amount: Amount, fee_rate: f64) -> Result<
     Err(Error::InvalidAmount("Not enough funds to cover amount and fees".into()))
 }
 
+pub async fn prepare_commit_reveal_config(
+    op_type: &str,
+    child_node_xonly_pubkey: &XOnlyPublicKey,
+    atomicals_payload: &[u8],
+    network: Network
+) -> Result<(ScriptBuf, Address)> {
+    // 构建 Taproot 脚本
+    let script = append_mint_update_reveal_script(op_type, &child_node_xonly_pubkey, atomicals_payload)?;
+    
+    // 创建 TaprootBuilder
+    let mut builder = TaprootBuilder::new();
+    builder = builder.add_leaf(0, script.clone())?;
+    
+    let secp = Secp256k1::new();
+    
+    // 构建 Taproot 输出
+    let merkle_root = builder.finalize(&secp, *child_node_xonly_pubkey)?;
+    let tr_script = ScriptBuf::new_v1_p2tr(&secp, *child_node_xonly_pubkey, merkle_root.merkle_root());
+    let tr_address = Address::from_script(&tr_script, network)?;
+    
+    Ok((script, tr_address))
+}
+
 pub async fn mint_ft<W: WalletProvider>(
     wallet: &W,
     config: Arc20Config,
@@ -84,21 +110,58 @@ pub async fn mint_ft<W: WalletProvider>(
 ) -> Result<AtomicalsTx> {
     log!("Starting mint_ft operation...");
 
-    // 获取钱包地址
+    // 获取钱包公钥和地址
     let address_str = wallet.get_address().await?;
     let address = Address::from_str(&address_str)
         .map_err(|e| Error::AddressError(e.to_string()))?
         .require_network(Network::Testnet)
         .map_err(|e| Error::NetworkError(e.to_string()))?;
 
+    let pubkey = wallet.get_public_key().await?;
+    let (xonly_pubkey, _parity) = pubkey.inner.x_only_public_key();
+    // 构建atomicals payload
+    let mut payload = std::collections::HashMap::new();
+    let mut token_data = std::collections::HashMap::new();
+    token_data.insert(0u32, config.mint_amount.0);
+    payload.insert(config.tick.clone(), token_data);
+    
+    let payload_cbor = serde_cbor::to_vec(&payload)
+        .map_err(|e| Error::SerializationError(format!("Failed to serialize payload: {}", e)))?;
+    
+    // 准备commit-reveal配置
+    let (script, script_address) = prepare_commit_reveal_config(
+        "ft",  // op_type for FT
+        &xonly_pubkey,
+        &payload_cbor,
+        Network::Testnet
+    ).await?;
+    
     // 获取 UTXO 列表和网络费率
     let utxos = wallet.get_utxos().await?;
     let fee_rate = wallet.get_network_fee_rate().await?;
     
+    // 计算reveal交易所需费用
+    let reveal_size = tx_size::calculate_reveal_size(
+        1, // 一个reveal input
+        1, // 一个输出
+        script.len(), // hash_lock script长度
+    );
+    let reveal_fee = Amount::from_sat((reveal_size * fee_rate) as u64);
+    
+    // 计算commit交易输出值（需要考虑reveal交易的输入和输出）
+    let commit_output_value = reveal_fee + Amount::from_sat(config.mint_amount.0);
+    
+    // 计算commit交易本身的费用
+    let commit_size = tx_size::calculate_commit_size(
+        1, // 一个输入
+        2, // 两个输出（P2TR输出和找零）
+    );
+    let commit_fee = Amount::from_sat((commit_size * fee_rate) as u64);
+    
     // 选择合适的 UTXO 并计算手续费
-    let (selected_utxos, fee) = select_utxos(
+    let (selected_utxos, _) = select_utxos(
         &utxos,
-        Amount::from_sat(config.mint_amount.0),
+        commit_output_value + commit_fee,
         fee_rate
     )?;
     
@@ -120,29 +183,24 @@ pub async fn mint_ft<W: WalletProvider>(
         })?;
     
     // 计算找零金额
-    let target_amount = Amount::from_sat(config.mint_amount.0);
-    let change_amount = match total_input.checked_sub(fee) {
-        Some(remaining) => match remaining.checked_sub(target_amount) {
+    let change_amount = match total_input.checked_sub(commit_fee) {
+        Some(remaining) => match remaining.checked_sub(commit_output_value) {
             Some(change) => change,
             None => return Err(Error::InvalidAmount("Not enough funds after fees".into())),
         },
         None => return Err(Error::InvalidAmount("Not enough funds to cover fees".into())),
     };
 
-    // 创建 commit 交易
+    // 创建 commit 交易输出
     let mut commit_outputs = vec![
         TxOut {
-            value: Amount::from_sat(0),
-            script_pubkey: address.script_pubkey(),
-        },
-        TxOut {
-            value: target_amount,
-            script_pubkey: address.script_pubkey(),
+            value: commit_output_value,
+            script_pubkey: script_address.script_pubkey(),
         },
     ];
     
     // 如果有找零，添加找零输出
-    if change_amount > Amount::from_sat(0) {
+    if change_amount > Amount::from_sat(546) {
         commit_outputs.push(TxOut {
             value: change_amount,
             script_pubkey: address.script_pubkey(),
@@ -157,31 +215,44 @@ pub async fn mint_ft<W: WalletProvider>(
     };
 
     let mut commit_psbt = Psbt::from_unsigned_tx(commit_tx.clone())
-    .map_err(|e| Error::PsbtError(format!("Failed to create commit PSBT: {}", e)))?;
-
+        .map_err(|e| Error::PsbtError(format!("Failed to create commit PSBT: {}", e)))?;
         
     // 添加输入的 UTXO 信息到 PSBT
     for (i, utxo) in selected_utxos.iter().enumerate() {
         commit_psbt.inputs[i].witness_utxo = Some(utxo.txout.clone());
+        commit_psbt.inputs[i].tap_internal_key = Some(xonly_pubkey);
     }
     
     log!("Created commit PSBT");
 
     // 创建 reveal 交易
+    let reveal_input = TxIn {
+        previous_output: OutPoint::new(commit_tx.txid(), 0),
+        script_sig: ScriptBuf::new(),
+        sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
+        witness: Default::default(),
+    };
+
     let reveal_tx = Transaction {
         version: Version(2),
         lock_time: bitcoin::absolute::LockTime::ZERO,
-        input: vec![],
+        input: vec![reveal_input],
         output: vec![
             TxOut {
-                value: target_amount,
+                value: Amount::from_sat(config.mint_amount.0),
                 script_pubkey: address.script_pubkey(),
             },
         ],
     };
 
-   let mut reveal_psbt = Psbt::from_unsigned_tx(reveal_tx.clone())
-    .map_err(|e| Error::PsbtError(format!("Failed to create reveal PSBT: {}", e)))?;
+    let mut reveal_psbt = Psbt::from_unsigned_tx(reveal_tx.clone())
+        .map_err(|e| Error::PsbtError(format!("Failed to create reveal PSBT: {}", e)))?;
+
+    // 添加reveal交易的witness_script和tap_internal_key
+    reveal_psbt.inputs[0].witness_script = Some(script.clone());
+    reveal_psbt.inputs[0].tap_internal_key = Some(xonly_pubkey);
+    reveal_psbt.inputs[0].tap_merkle_root = None; // 使用默认的Merkle root
+    
     log!("Created reveal PSBT");
 
     // Mine transactions if needed

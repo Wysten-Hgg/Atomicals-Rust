@@ -5,6 +5,10 @@ pub mod script_builder;
 pub use script_builder::*;
 
 pub mod tx_size;
+pub mod script;
+
+pub use tx_size::*;
+pub use script::*;
 
 pub fn validate_ticker(ticker: &str) -> bool {
     // Ticker rules:

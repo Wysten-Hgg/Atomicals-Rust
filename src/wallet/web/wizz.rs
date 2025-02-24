@@ -114,19 +114,29 @@ impl WalletProvider for WizzProvider {
     }
 
     async fn get_public_key(&self) -> Result<PublicKey> {
-        // 尝试从 accounts 获取地址
-        let accounts = self.call_wallet_method("accounts", &[])?;
-        let accounts_array: Array = accounts.unchecked_into();
+        log!("Requesting public key");
+        let result = self.call_wallet_method("getPublicKey", &[])?;
         
-        if accounts_array.length() == 0 {
-            return Err(Error::WalletError("No accounts available".to_string()));
+        log!("Public key result type: {:?}", result.js_typeof());
+        
+        if result.is_object() {
+            log!("Waiting for getPublicKey promise to resolve");
+            
+            if let Ok(pubkey_value) = JsFuture::from(result.unchecked_into::<Promise>()).await {
+                log!("Public key received");
+                let pubkey_hex = pubkey_value.as_string()
+                    .ok_or_else(|| Error::WalletError("Invalid public key format".to_string()))?;
+                
+                // 移除可能的 "0x" 前缀
+                let pubkey_hex = pubkey_hex.trim_start_matches("0x");
+                
+                // 将十六进制字符串转换为 PublicKey
+                return PublicKey::from_str(&pubkey_hex)
+                    .map_err(|e| Error::WalletError(format!("Failed to parse public key: {}", e)));
+            }
         }
-
-        let account = accounts_array.get(0);
-        let account_str: String = from_value(account)?;
-
-        // 将地址转换为公钥（这里需要实际的转换逻辑）
-        Err(Error::WalletError("Public key not available".to_string()))
+        
+        Err(Error::WalletError("Failed to get public key".to_string()))
     }
 
     async fn get_address(&self) -> Result<String> {

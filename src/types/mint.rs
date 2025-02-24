@@ -36,11 +36,13 @@ impl BitworkInfo {
             };
         }
 
-        // 将输入字符串转换为数字
-        let num = match input.parse::<u32>() {
-            Ok(n) => n,
-            Err(_) => {
-                web_sys::console::log_1(&"Invalid number format, using default difficulty".into());
+        // 解析输入字符串，支持扩展要求（例如 "aabbcc:ext"）
+        let parts: Vec<&str> = input.split(':').collect();
+        let (prefix, ext) = match parts.len() {
+            1 => (parts[0].to_string(), None),
+            2 => (parts[0].to_string(), Some(parts[1].to_string())),
+            _ => {
+                web_sys::console::log_1(&"Invalid bitwork format, using default values".into());
                 return Self {
                     prefix: "0000".to_string(),
                     ext: None,
@@ -49,32 +51,28 @@ impl BitworkInfo {
             }
         };
 
-        // 根据输入数字确定前缀0的个数
-        // 例如：输入"8888"，我们要求8个前导0
-        let zeros = if num <= 10 {
-            1  // 如果输入1-10，要求1个0
-        } else if num <= 100 {
-            2  // 如果输入11-100，要求2个0
-        } else if num <= 1000 {
-            3  // 如果输入101-1000，要求3个0
-        } else if num <= 10000 {
-            4  // 如果输入1001-10000，要求4个0
-        } else {
-            5  // 更大的数字，要求5个0
-        };
+        // 验证前缀是否有效（仅包含十六进制字符）
+        if !prefix.chars().all(|c| c.is_ascii_hexdigit()) {
+            web_sys::console::log_1(&"Invalid prefix, using default values".into());
+            return Self {
+                prefix: "0000".to_string(),
+                ext: None,
+                difficulty: 16,
+            };
+        }
 
-        let prefix = "0".repeat(zeros);
-        let difficulty = zeros * 4; // 每个十六进制0代表4位二进制
+        // 计算难度（基于前缀长度）
+        let difficulty = prefix.len() as u32 * 4;
 
         web_sys::console::log_1(&format!(
-            "Created BitworkInfo with {} leading zeros (prefix: {}, difficulty: {})",
-            zeros, prefix, difficulty
+            "Created BitworkInfo with prefix: {}, ext: {:?}, difficulty: {}",
+            prefix, ext, difficulty
         ).into());
 
         Self {
             prefix,
-            ext: None,
-            difficulty: difficulty as u32,
+            ext,
+            difficulty,
         }
     }
 
@@ -84,20 +82,19 @@ impl BitworkInfo {
     }
 
     pub fn matches(&self, txid: &str) -> bool {
-        // 检查txid是否以指定数量的0开头
-        let required_zeros = self.prefix.len();
-        if txid.len() < required_zeros {
+        // 检查txid是否以指定前缀开头
+        let required_prefix_len = self.prefix.len();
+        if txid.len() < required_prefix_len {
             return false;
         }
 
-        // 检查前缀中的每个字符是否为"0"
-        if !txid[..required_zeros].chars().all(|c| c == '0') {
+        if !txid.starts_with(&self.prefix) {
             return false;
         }
 
         // 检查扩展要求（如果有）
         if let Some(ext) = &self.ext {
-            let ext_pos = required_zeros;
+            let ext_pos = required_prefix_len;
             if ext_pos + ext.len() > txid.len() {
                 return false;
             }

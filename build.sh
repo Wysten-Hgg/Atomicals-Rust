@@ -1,18 +1,18 @@
-#!/bin/bash
+﻿#!/bin/bash
 
-# 启用错误检查
+# 鍚敤閿欒妫€鏌?
 set -e
 
 echo "Starting build process..."
 
-# 检查 wasm-pack 是否安装
+# 妫€鏌?wasm-pack 鏄惁瀹夎
 if ! command -v wasm-pack &> /dev/null; then
     echo "wasm-pack not found. Please install it with: cargo install wasm-pack"
     exit 1
 fi
 
 echo "Building WebAssembly with wasm-pack..."
-# 添加 --verbose 参数来获取更多输出信息
+# 娣诲姞 --verbose 鍙傛暟鏉ヨ幏鍙栨洿澶氳緭鍑轰俊鎭?
 wasm-pack build --target web --verbose
 
 # echo "Creating dist directory..."

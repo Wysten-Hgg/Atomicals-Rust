@@ -106,3 +106,31 @@ impl From<Error> for JsValue {
         JsValue::from_str(&error.to_string())
     }
 }
+
+// 添加 script::Error 的转换
+impl From<crate::utils::script::Error> for Error {
+    fn from(e: crate::utils::script::Error) -> Self {
+        Error::SerializationError(e.to_string())
+    }
+}
+
+// 添加 TaprootBuilderError 的转换
+impl From<bitcoin::taproot::TaprootBuilderError> for Error {
+    fn from(e: bitcoin::taproot::TaprootBuilderError) -> Self {
+        Error::TransactionError(e.to_string())
+    }
+}
+
+// 添加 TaprootBuilder 的转换
+impl From<bitcoin::taproot::TaprootBuilder> for Error {
+    fn from(e: bitcoin::taproot::TaprootBuilder) -> Self {
+        Error::TransactionError("Taproot builder error".to_string())
+    }
+}
+
+// 添加 bitcoin::address::Error 的转换
+impl From<bitcoin::address::Error> for Error {
+    fn from(e: bitcoin::address::Error) -> Self {
+        Error::AddressError(e.to_string())
+    }
+}
