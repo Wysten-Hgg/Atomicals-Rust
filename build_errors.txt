@@ -167,9 +167,9 @@ warning: use of deprecated associated function `bitcoin::ScriptBuf::new_v1_p2tr`
     = note: `#[warn(deprecated)]` on by default
 
 warning: unused variable: `mining_opts`
-   --> src/operations/mint_ft.rs:259:21
+   --> src/operations/mint_ft.rs:266:21
     |
-259 |     if let Some(ref mining_opts) = mining_options {
+266 |     if let Some(ref mining_opts) = mining_options {
     |                     ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_mining_opts`
 
 warning: use of deprecated method `bitcoin::Script::is_v0_p2wpkh`: use is_p2wpkh instead
@@ -224,16 +224,10 @@ warning: unused variable: `script_type`
 50 |         let script_type = ScriptType::from_script(&utxo.txout.script_pubkey)
    |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_script_type`
 
-warning: unused variable: `account_str`
-   --> src/wallet/web/wizz.rs:126:13
-    |
-126 |         let account_str: String = from_value(account)?;
-    |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_account_str`
-
 warning: unused variable: `promise`
-   --> src/wallet/web/wizz.rs:154:27
+   --> src/wallet/web/wizz.rs:164:27
     |
-154 |                 if let Ok(promise) = JsFuture::from(connect_result.unchecked_into::<Promise>()).await {
+164 |                 if let Ok(promise) = JsFuture::from(connect_result.unchecked_into::<Promise>()).await {
     |                           ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_promise`
 
 warning: unused variable: `commit_psbt`
@@ -336,5 +330,5 @@ warning: field `account` is never read
    |
    = note: `WizzProvider` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
 
-warning: `atomicals-rs` (lib) generated 41 warnings (run `cargo fix --lib -p atomicals-rs` to apply 18 suggestions)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.22s
+warning: `atomicals-rs` (lib) generated 40 warnings (run `cargo fix --lib -p atomicals-rs` to apply 18 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.70s

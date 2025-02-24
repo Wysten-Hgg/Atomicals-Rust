@@ -1,7 +1,7 @@
 use crate::errors::{Error, Result};
 use crate::wallet::{WalletProvider, Utxo};
 use async_trait::async_trait;
-use bitcoin::{Transaction, TxOut, Network, PublicKey, Amount, OutPoint, Psbt, Address};
+use bitcoin::{Transaction, TxOut, Network, PublicKey, Amount, OutPoint, Psbt, Address, Txid};
 use wasm_bindgen::prelude::*;
 use js_sys::{Function, Object, Promise, Reflect, Array};
 use serde_wasm_bindgen::{to_value, from_value};
@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use reqwest;
 use serde_json::Value;
 use bitcoin::hashes::{sha256, Hash};
+use hex;
 
 #[derive(Debug, Deserialize)]
 struct UtxoResponse {
@@ -347,25 +348,51 @@ impl WalletProvider for WizzProvider {
     }
 
     async fn broadcast_transaction(&self, tx: Transaction) -> Result<String> {
+        // 将交易转换为十六进制
         let tx_hex = bitcoin::consensus::encode::serialize_hex(&tx);
-        let result = self.call_wallet_method("sendTransaction", &[to_value(&tx_hex)?])?;
         
+        // 直接调用 pushPsbt 方法
+        let promise = self.call_wallet_method("pushTx", &[to_value(&tx_hex)?])?;
+        let promise = js_sys::Promise::from(promise);
+        let result = wasm_bindgen_futures::JsFuture::from(promise).await
+            .map_err(|e| Error::WalletError(format!("Failed to broadcast transaction: {:?}", e)))?;
+        
+        // 返回交易ID
         from_value(result)
-            .map_err(|e| Error::WalletError(format!("Failed to broadcast transaction: {}", e)))
+            .map_err(|e| Error::WalletError(format!("Failed to parse txid: {}", e)))
     }
 
     async fn sign_psbt(&self, psbt: Psbt) -> Result<Psbt> {
         let psbt_bytes = psbt.serialize();
-        let psbt_base64 = BASE64.encode(psbt_bytes);
+        let psbt_hex = hex::encode(psbt_bytes);
         
-        let result = self.call_wallet_method("signPsbt", &[to_value(&psbt_base64)?])?;
+        log!("Sending PSBT to wallet for signing: {}", &psbt_hex);
         
-        let signed_psbt_str: String = from_value(result)?;
-        let signed_psbt_bytes = BASE64.decode(signed_psbt_str.as_bytes())
-            .map_err(|e| Error::WalletError(format!("Failed to decode base64 PSBT: {}", e)))?;
+        // 调用钱包方法并等待 Promise 完成
+        let promise = self.call_wallet_method("signPsbt", &[to_value(&psbt_hex)?])?;
+        let promise = js_sys::Promise::from(promise);
+        let result = wasm_bindgen_futures::JsFuture::from(promise).await
+            .map_err(|e| Error::WalletError(format!("Failed to await signPsbt promise: {:?}", e)))?;
         
-        Psbt::deserialize(&signed_psbt_bytes)
-            .map_err(|e| Error::WalletError(format!("Failed to parse signed PSBT: {}", e)))
+        // 从 JsValue 转换为字符串
+        let signed_psbt_hex: String = from_value(result)
+            .map_err(|e| Error::WalletError(format!("Failed to parse signed PSBT result: {}", e)))?;
+            
+        log!("Received signed PSBT from wallet: {}", &signed_psbt_hex);
+        
+        // 解码十六进制字符串
+        let signed_psbt_bytes = hex::decode(&signed_psbt_hex)
+            .map_err(|e| Error::WalletError(format!("Failed to decode hex PSBT: {}", e)))?;
+        
+        let signed_psbt = Psbt::deserialize(&signed_psbt_bytes)
+            .map_err(|e| Error::WalletError(format!("Failed to parse signed PSBT: {}", e)))?;
+            
+        // 验证PSBT是否已经完全签名
+        if signed_psbt.inputs.iter().any(|input| input.final_script_sig.is_none() && input.final_script_witness.is_none()) {
+            return Err(Error::WalletError("PSBT signing incomplete".into()));
+        }
+        
+        Ok(signed_psbt)
     }
 }
 

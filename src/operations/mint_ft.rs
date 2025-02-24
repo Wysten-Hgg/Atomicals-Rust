@@ -9,13 +9,16 @@ use bitcoin::{
     Amount, Network, Transaction, TxIn, TxOut, Sequence,
     psbt::Psbt, ScriptBuf, Address, taproot::{TapTree, TaprootBuilder, LeafVersion},
     transaction::Version, key::XOnlyPublicKey, secp256k1::Secp256k1,
-    OutPoint, // <--- Added OutPoint import
+    OutPoint,
 };
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 use serde_wasm_bindgen;
 use serde_cbor;
 use crate::utils::script::append_mint_update_reveal_script;
+use web_sys;
+use js_sys;
+use wasm_bindgen_futures;
 
 #[cfg(target_arch = "wasm32")]
 macro_rules! log {
@@ -221,6 +224,10 @@ pub async fn mint_ft<W: WalletProvider>(
     for (i, utxo) in selected_utxos.iter().enumerate() {
         commit_psbt.inputs[i].witness_utxo = Some(utxo.txout.clone());
         commit_psbt.inputs[i].tap_internal_key = Some(xonly_pubkey);
+        // 修复 tap_key_origins 的类型
+        let mut origins = std::collections::BTreeMap::new();
+        origins.insert(xonly_pubkey, (vec![], (bitcoin::bip32::Fingerprint::default(), bitcoin::bip32::DerivationPath::default())));
+        commit_psbt.inputs[i].tap_key_origins = origins;
     }
     
     log!("Created commit PSBT");
@@ -251,9 +258,32 @@ pub async fn mint_ft<W: WalletProvider>(
     // 添加reveal交易的witness_script和tap_internal_key
     reveal_psbt.inputs[0].witness_script = Some(script.clone());
     reveal_psbt.inputs[0].tap_internal_key = Some(xonly_pubkey);
-    reveal_psbt.inputs[0].tap_merkle_root = None; // 使用默认的Merkle root
+    let mut origins = std::collections::BTreeMap::new();
+    origins.insert(xonly_pubkey, (vec![], (bitcoin::bip32::Fingerprint::default(), bitcoin::bip32::DerivationPath::default())));
+    reveal_psbt.inputs[0].tap_key_origins = origins;
+    reveal_psbt.inputs[0].witness_utxo = Some(commit_tx.output[0].clone());
     
-    log!("Created reveal PSBT");
+    // 添加 Taproot 特定字段
+    let secp = Secp256k1::new();
+    let mut builder = TaprootBuilder::new();
+    builder = builder.add_leaf(0, script.clone())?;
+    let merkle_root = builder.finalize(&secp, xonly_pubkey)?;
+    
+    // 获取 merkle_root，如果为 None 则返回错误
+    let tap_merkle_root = merkle_root.merkle_root()
+        .ok_or_else(|| Error::TransactionError("Failed to get merkle root".into()))?;
+    reveal_psbt.inputs[0].tap_merkle_root = Some(tap_merkle_root);
+    
+    // 创建控制块
+    let control_block = merkle_root.control_block(&(script.clone(), LeafVersion::TapScript))
+        .ok_or_else(|| Error::TransactionError("Failed to create control block".into()))?;
+    
+    // 设置 tap_scripts
+    let mut tap_scripts = std::collections::BTreeMap::new();
+    tap_scripts.insert(control_block, (script.clone(), LeafVersion::TapScript));
+    reveal_psbt.inputs[0].tap_scripts = tap_scripts;
+    
+    log!("Created reveal PSBT with Taproot script");
 
     // Mine transactions if needed
     if let Some(ref mining_opts) = mining_options {
@@ -302,21 +332,34 @@ pub async fn mint_ft<W: WalletProvider>(
     log!("Signing transactions...");
     let signed_commit = wallet.sign_psbt(commit_psbt).await?;
     let signed_reveal = wallet.sign_psbt(reveal_psbt).await?;
-
-    // Extract transactions
-    let commit_tx = signed_commit.extract_tx()
-        .map_err(|e| Error::TransactionError(format!("Failed to extract commit tx: {}", e)))?;
+    
+   // Extract transactions
+   let commit_tx = signed_commit.extract_tx()
+   .map_err(|e| Error::TransactionError(format!("Failed to extract commit tx: {}", e)))?;
 
     let reveal_tx = signed_reveal.extract_tx()
-        .map_err(|e| Error::TransactionError(format!("Failed to extract reveal tx: {}", e)))?;
-
-    // Broadcast commit transaction
+   .map_err(|e| Error::TransactionError(format!("Failed to extract reveal tx: {}", e)))?;
+    
+    // Broadcast commit transaction first
     let commit_txid = wallet.broadcast_transaction(commit_tx.clone()).await?;
-
+    log!("Commit transaction broadcast successfully: {}", commit_txid);
+    
+    // Wait for a short time to ensure commit tx propagation
+    let promise = js_sys::Promise::new(&mut |resolve, _| {
+        web_sys::window()
+            .unwrap()
+            .set_timeout_with_callback_and_timeout_and_arguments_0(
+                &resolve,
+                2000, // 2 seconds
+            )
+            .unwrap();
+    });
+    wasm_bindgen_futures::JsFuture::from(promise).await.unwrap();
+    
     // Broadcast reveal transaction
     let reveal_txid = wallet.broadcast_transaction(reveal_tx.clone()).await?;
-
-    // Create AtomicalsTx
+    log!("Reveal transaction broadcast successfully: {}", reveal_txid);
+    
     let atomicals_tx = AtomicalsTx::new_with_commit_reveal(
         commit_tx,
         reveal_tx,
