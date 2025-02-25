@@ -47,8 +47,7 @@ impl MiningOptions {
 pub struct MiningResult {
     pub success: bool,
     pub nonce: Option<u32>,
-    #[serde(skip)]
-    pub tx_hex: Option<String>,
+    pub tx_hex: Option<String>,  // 移除 #[serde(skip)]
 }
 
 impl MiningResult {
@@ -72,7 +71,7 @@ impl MiningResult {
 // 在Rust中进行挖矿计算的函数
 #[wasm_bindgen]
 pub fn mine_nonce_range(
-    tx_wrapper: &WasmTransaction,
+    tx_wrapper: &mut WasmTransaction,
     start_nonce: u32,
     end_nonce: u32,
     bitwork: &str,
@@ -101,21 +100,21 @@ pub fn mine_nonce_range(
     None
 }
 
-fn check_nonce(tx: &WasmTransaction, nonce: u32, bitwork: &str) -> Option<u32> {
-    let nonce_hex = format!("{:08x}", nonce);
-    let data_with_nonce = format!("{}{}", tx.to_hex(), nonce_hex);
-    
-    let mut hasher = Sha256::new();
-    hasher.update(hex::decode(&data_with_nonce).unwrap());
-    let result = hasher.finalize();
-    let txid = hex::encode(result);
-    
-    // 首先检查基本的bitwork前缀
-    if has_valid_bitwork(&txid, bitwork, None) {
-        Some(nonce)
-    } else {
-        None
+fn check_nonce(tx: &mut WasmTransaction, nonce: u32, bitwork: &str) -> Option<u32> {
+    if let Some(mut transaction) = tx.to_transaction() {
+        if !transaction.input.is_empty() {
+            // 确保我们使用原始nonce值
+            transaction.input[0].sequence = bitcoin::transaction::Sequence(nonce);
+            let txid = transaction.txid().to_string();
+            if has_valid_bitwork(&txid, bitwork, None) {
+                // 更新WasmTransaction
+                *tx = WasmTransaction::from_transaction(&transaction);
+                log!("Found valid nonce: {}, sequence: {:?}", nonce, transaction.input[0].sequence);
+                return Some(nonce);
+            }
+        }
     }
+    None
 }
 
 fn has_valid_bitwork(txid: &str, bitwork: &str, bitworkx: Option<u32>) -> bool {
@@ -170,9 +169,10 @@ fn create_worker(
             if let Ok(msg_type) = Reflect::get(&data, &"type".into()) {
                 match msg_type.as_string().as_deref() {
                     Some("success") => {
-                        if let (Ok(success), Ok(nonce)) = (
+                        if let (Ok(success), Ok(nonce), Ok(tx_data)) = (
                             Reflect::get(&data, &"success".into()),
                             Reflect::get(&data, &"nonce".into()),
+                            Reflect::get(&data, &"tx".into()),
                         ) {
                             if success.as_bool().unwrap_or(false) {
                                 let nonce_value = nonce.as_f64().map(|n| n as u32);
@@ -182,6 +182,16 @@ fn create_worker(
                                 let mut result = shared_result.borrow_mut();
                                 result.success = true;
                                 result.nonce = nonce_value;
+                                
+                                // 保存修改后的交易hex
+                                if let Ok(tx_obj) = tx_data.dyn_into::<Object>() {
+                                    if let Ok(tx_hex) = Reflect::get(&tx_obj, &"hex".into()) {
+                                        if let Some(hex_str) = tx_hex.as_string() {
+                                            result.tx_hex = Some(hex_str);
+                                            log!("Successfully saved modified transaction hex");
+                                        }
+                                    }
+                                }
                                 
                                 // 向所有 worker 发送停止信号
                                 for w in workers_ref.borrow().iter() {
@@ -251,6 +261,7 @@ pub async fn mine_transaction(
 ) -> Result<JsValue> {
     log!("Starting mining with {} workers", options.num_workers);
     
+    // 验证输入交易
     let tx = tx_wrapper.to_transaction()
         .ok_or_else(|| Error::DeserializationError("Failed to deserialize transaction".into()))?;
     let bitwork = bitwork_wrapper.to_bitwork_info();
@@ -351,6 +362,17 @@ pub async fn mine_transaction(
     // 确保所有 worker 都已停止
     for worker in workers.borrow().iter() {
         worker.terminate();
+    }
+    
+    // 在返回结果之前验证交易
+    if final_result.success {
+        if let Some(tx) = final_result.get_transaction() {
+            log!("Validating mined transaction...");
+            // 验证第一个输入的sequence是否已被修改
+            if !tx.input.is_empty() {
+                log!("Mined transaction sequence: {:?}", tx.input[0].sequence);
+            }
+        }
     }
     
     // 返回结果

@@ -27,6 +27,18 @@ impl WasmTransaction {
     pub fn from_hex(hex: String) -> Self {
         Self { hex }
     }
+
+    #[wasm_bindgen]
+    pub fn set_sequence(&mut self, nonce: u32) -> bool {
+        if let Some(mut tx) = self.to_transaction() {
+            if !tx.input.is_empty() {
+                tx.input[0].sequence = bitcoin::transaction::Sequence(nonce);
+                self.hex = hex::encode(consensus::serialize(&tx));
+                return true;
+            }
+        }
+        false
+    }
 }
 
 impl WasmTransaction {

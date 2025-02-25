@@ -249,11 +249,11 @@ function __wbg_adapter_47(arg0, arg1) {
 }
 
 function __wbg_adapter_52(arg0, arg1, arg2) {
-    wasm.closure229_externref_shim(arg0, arg1, arg2);
+    wasm.closure232_externref_shim(arg0, arg1, arg2);
 }
 
-function __wbg_adapter_200(arg0, arg1, arg2, arg3) {
-    wasm.closure288_externref_shim(arg0, arg1, arg2, arg3);
+function __wbg_adapter_201(arg0, arg1, arg2, arg3) {
+    wasm.closure297_externref_shim(arg0, arg1, arg2, arg3);
 }
 
 const __wbindgen_enum_RequestCredentials = ["omit", "same-origin", "include"];
@@ -530,6 +530,14 @@ export class WasmTransaction {
         const ret = wasm.wasmtransaction_from_hex(ptr0, len0);
         return WasmTransaction.__wrap(ret);
     }
+    /**
+     * @param {number} nonce
+     * @returns {boolean}
+     */
+    set_sequence(nonce) {
+        const ret = wasm.wasmtransaction_set_sequence(this.__wbg_ptr, nonce);
+        return ret !== 0;
+    }
 }
 
 const WizzProviderFinalization = (typeof FinalizationRegistry === 'undefined')
@@ -759,7 +767,7 @@ function __wbg_get_imports() {
                 const a = state0.a;
                 state0.a = 0;
                 try {
-                    return __wbg_adapter_200(a, state0.b, arg0, arg1);
+                    return __wbg_adapter_201(a, state0.b, arg0, arg1);
                 } finally {
                     state0.a = a;
                 }
@@ -956,8 +964,8 @@ function __wbg_get_imports() {
         const ret = false;
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper1183 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 230, __wbg_adapter_52);
+    imports.wbg.__wbindgen_closure_wrapper1190 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 233, __wbg_adapter_52);
         return ret;
     };
     imports.wbg.__wbindgen_closure_wrapper153 = function(arg0, arg1, arg2) {

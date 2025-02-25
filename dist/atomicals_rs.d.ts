@@ -30,6 +30,7 @@ export class WasmTransaction {
   constructor(hex: string);
   to_hex(): string;
   static from_hex(hex: string): WasmTransaction;
+  set_sequence(nonce: number): boolean;
 }
 export class WizzProvider {
   free(): void;
@@ -51,6 +52,7 @@ export interface InitOutput {
   readonly __wbg_wasmtransaction_free: (a: number, b: number) => void;
   readonly wasmtransaction_to_hex: (a: number) => [number, number];
   readonly wasmtransaction_from_hex: (a: number, b: number) => number;
+  readonly wasmtransaction_set_sequence: (a: number, b: number) => number;
   readonly __wbg_wasmbitworkinfo_free: (a: number, b: number) => void;
   readonly wasmbitworkinfo_new: (a: number, b: number, c: number, d: number) => number;
   readonly wasmbitworkinfo_get_difficulty: (a: number) => [number, number];
@@ -79,8 +81,8 @@ export interface InitOutput {
   readonly __externref_table_dealloc: (a: number) => void;
   readonly closure5_externref_shim: (a: number, b: number, c: any) => void;
   readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h34ced8d1dcb0005d: (a: number, b: number) => void;
-  readonly closure229_externref_shim: (a: number, b: number, c: any) => void;
-  readonly closure288_externref_shim: (a: number, b: number, c: any, d: any) => void;
+  readonly closure232_externref_shim: (a: number, b: number, c: any) => void;
+  readonly closure297_externref_shim: (a: number, b: number, c: any, d: any) => void;
   readonly __wbindgen_start: () => void;
 }
 

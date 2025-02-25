@@ -130,12 +130,13 @@
                     log(`Batch result: ${result} (type: ${typeof result})`);
 
                     if (result !== undefined && result !== null) {
-                        log(`Found valid nonce: ${result}, matches required prefix: ${bitwork}`);
+                        // 获取修改后的交易hex
+                        const modifiedTxHex = wasmTx.to_hex();
                         self.postMessage({
                             type: 'success',
                             success: true,
                             nonce: result,
-                            tx: tx_wrapper,
+                            tx: { hex: modifiedTxHex },  // 返回修改后的交易
                             finished: true
                         });
                         return;  // 找到有效 nonce 后立即返回

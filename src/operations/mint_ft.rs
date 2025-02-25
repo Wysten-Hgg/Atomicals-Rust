@@ -105,7 +105,8 @@ pub async fn prepare_commit_reveal_config(
 ) -> Result<(ScriptBuf, Address)> {
     // 构建 Taproot 脚本
     let script = append_mint_update_reveal_script(op_type, &child_node_xonly_pubkey, atomicals_payload)?;
-    
+    log!("Taproot script: {:?}", script.clone());
+                    
     // 创建 TaprootBuilder
     let mut builder = TaprootBuilder::new();
     builder = builder.add_leaf(0, script.clone())?;
@@ -197,7 +198,7 @@ pub async fn mint_ft<W: WalletProvider>(
         .map(|utxo| TxIn {
             previous_output: utxo.outpoint,
             script_sig: ScriptBuf::new(),
-            sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
+            sequence: Sequence::ZERO,  // 使用ZERO而不是ENABLE_RBF_NO_LOCKTIME
             witness: Default::default(),
         })
         .collect();
@@ -256,11 +257,55 @@ pub async fn mint_ft<W: WalletProvider>(
     
     log!("Created commit PSBT");
 
+    // Mine transactions if needed
+    let mut mined_commit_tx = commit_tx.clone();
+    if let Some(ref mining_opts) = mining_options {
+        if let Some(ref bitworkc) = config.mint_bitworkc {
+            log!("Mining commit transaction...");
+            let mining_result = mine_transaction(
+                WasmTransaction::from_transaction(&commit_tx),
+                WasmBitworkInfo::from_bitwork_info(&BitworkInfo::new(bitworkc.clone())),
+                MiningOptions::new(),
+            ).await?;
+
+            let mining_result: MiningResult = serde_wasm_bindgen::from_value(mining_result)?;
+            if mining_result.success {
+                if let Some(mined_tx) = mining_result.get_transaction() {
+                    log!("Mining successful, transaction sequence: {:?}", mined_tx.input[0].sequence);
+                    
+                    // 创建新的PSBT，保留所有原始信息
+                    commit_psbt = Psbt::from_unsigned_tx(mined_tx.clone())
+                        .map_err(|e| Error::PsbtError(format!("Failed to create PSBT after mining commit tx: {}", e)))?;
+                    
+                    // 重新添加UTXO信息
+                    for (i, utxo) in selected_utxos.iter().enumerate() {
+                        commit_psbt.inputs[i].witness_utxo = Some(utxo.txout.clone());
+                        commit_psbt.inputs[i].tap_internal_key = Some(xonly_pubkey);
+                        let mut origins = std::collections::BTreeMap::new();
+                        origins.insert(xonly_pubkey, (vec![], (bitcoin::bip32::Fingerprint::default(), bitcoin::bip32::DerivationPath::default())));
+                        commit_psbt.inputs[i].tap_key_origins = origins;
+                        
+                        // 确保PSBT中的sequence值与挖矿结果一致
+                        if i == 0 {
+                            commit_psbt.unsigned_tx.input[i].sequence = mined_tx.input[0].sequence;
+                        }
+                    }
+                    
+                    log!("PSBT updated with mined transaction and UTXO info");
+                    log!("PSBT sequence value: {:?}", commit_psbt.unsigned_tx.input[0].sequence);
+                    mined_commit_tx = mined_tx.clone();
+                }
+            } else {
+                return Err(Error::MiningError("Failed to mine commit transaction".into()));
+            }
+        }
+    }
+
     // 创建 reveal 交易
     let reveal_input = TxIn {
-        previous_output: OutPoint::new(commit_tx.txid(), 0),
+        previous_output: OutPoint::new(mined_commit_tx.txid(), 0),
         script_sig: ScriptBuf::new(),
-        sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
+        sequence: Sequence::ZERO,
         witness: Default::default(),
     };
 
@@ -285,7 +330,7 @@ pub async fn mint_ft<W: WalletProvider>(
     let mut origins = std::collections::BTreeMap::new();
     origins.insert(xonly_pubkey, (vec![], (bitcoin::bip32::Fingerprint::default(), bitcoin::bip32::DerivationPath::default())));
     reveal_psbt.inputs[0].tap_key_origins = origins;
-    reveal_psbt.inputs[0].witness_utxo = Some(commit_tx.output[0].clone());
+    reveal_psbt.inputs[0].witness_utxo = Some(mined_commit_tx.output[0].clone());
     
     // 添加 Taproot 特定字段
     let secp = Secp256k1::new();
@@ -311,26 +356,6 @@ pub async fn mint_ft<W: WalletProvider>(
 
     // Mine transactions if needed
     if let Some(ref mining_opts) = mining_options {
-        if let Some(ref bitworkc) = config.mint_bitworkc {
-            log!("Mining commit transaction...");
-            let mining_result = mine_transaction(
-                WasmTransaction::from_transaction(&commit_tx),
-                WasmBitworkInfo::from_bitwork_info(&BitworkInfo::new(bitworkc.clone())),
-                MiningOptions::new(),
-            ).await?;
-
-            let mining_result: MiningResult = serde_wasm_bindgen::from_value(mining_result)?;
-            if mining_result.success {
-                if let Some(mined_tx) = mining_result.get_transaction() {
-                    commit_psbt = Psbt::from_unsigned_tx(mined_tx)
-                        .map_err(|e| Error::PsbtError(format!("Failed to create PSBT after mining commit tx: {}", e)))?;
-                    log!("Commit transaction mined successfully");
-                }
-            } else {
-                return Err(Error::MiningError("Failed to mine commit transaction".into()));
-            }
-        }
-
         if let Some(ref bitworkr) = config.mint_bitworkr {
             log!("Mining reveal transaction...");
             let mining_result = mine_transaction(
