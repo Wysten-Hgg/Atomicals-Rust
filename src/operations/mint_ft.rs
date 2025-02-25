@@ -112,9 +112,13 @@ pub async fn prepare_commit_reveal_config(
     
     let secp = Secp256k1::new();
     
-    // 构建 Taproot 输出
-    let merkle_root = builder.finalize(&secp, *child_node_xonly_pubkey)?;
-    let tr_script = ScriptBuf::new_v1_p2tr(&secp, *child_node_xonly_pubkey, merkle_root.merkle_root());
+    // 构建 Taproot 输出并验证脚本是否在路径中
+    let taproot_info = builder.finalize(&secp, *child_node_xonly_pubkey)?;
+    if taproot_info.merkle_root().is_none() {
+        return Err(Error::TransactionError("Failed to add script to Taproot path".into()));
+    }
+    
+    let tr_script = ScriptBuf::new_v1_p2tr(&secp, *child_node_xonly_pubkey, Some(taproot_info.merkle_root().unwrap()));
     let tr_address = Address::from_script(&tr_script, network)?;
     
     Ok((script, tr_address))

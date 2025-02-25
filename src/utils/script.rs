@@ -4,17 +4,17 @@ use bitcoin::{
         OP_0,
     },
     script::PushBytes,
+    script::Script,
+    script::ScriptBuf,
     secp256k1::Keypair,
-    Address, PrivateKey, Script, ScriptBuf, XOnlyPublicKey,
+    Address, PrivateKey, XOnlyPublicKey,
 };
 use std::error::Error as StdError;
 use std::fmt;
-use std::time::{SystemTime, UNIX_EPOCH};
-use serde::Serialize;
-use rand::Rng;
 use wasm_bindgen::prelude::*;
 use web_sys::{window, Performance};
 use js_sys::Math;
+use serde::Serialize;
 
 #[derive(Debug)]
 pub enum Error {
@@ -69,29 +69,19 @@ pub fn append_mint_update_reveal_script(
 #[cfg(target_arch = "wasm32")]
 pub fn time_nonce() -> (u64, u64) {
     let window = window().expect("should have a window in this context");
-    let performance = window
-        .performance()
-        .expect("performance should be available");
-    let now = performance.now() as u64;
+    let date = js_sys::Date::new_0();
+    let now = (date.get_time() / 1000.0) as u64;  // 转换为秒
     let random = (Math::random() * 10_000_000.0) as u64;
-    (now / 1000, random)
+    (now, random)
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-pub fn time_nonce() -> (u64, u64) {
-    (
-        SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
-        rand::thread_rng().gen_range(1..10_000_000),
-    )
-}
-
+#[cfg(target_arch = "wasm32")]
 pub fn cbor<T>(v: &T) -> Result<Vec<u8>>
 where
     T: Serialize,
 {
     let mut cbor = Vec::new();
-
-    ciborium::into_writer(v, &mut cbor)?;
-
+    ciborium::ser::into_writer(v, &mut cbor)
+        .map_err(|e| Error::Serialization(e.to_string()))?;
     Ok(cbor)
 }
