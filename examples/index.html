@@ -375,12 +375,22 @@
                     // 设置Mint Amount和Bitwork C的值
                     const mintAmountInput = document.getElementById('mintAmount');
                     const bitworkCInput = document.getElementById('bitworkC');
+                    const bitworkRInput = document.getElementById('bitworkR');
                     
                     mintAmountInput.value = result.$mint_amount || '';
                     mintAmountInput.disabled = true;
                     
                     bitworkCInput.value = result.$mint_bitworkc || '';
                     bitworkCInput.disabled = true;
+
+                    // 处理 Bitwork R
+                    if (result.$mint_bitworkr) {
+                        bitworkRInput.value = result.$mint_bitworkr;
+                        bitworkRInput.disabled = true;
+                    } else {
+                        bitworkRInput.value = '';
+                        bitworkRInput.disabled = true;
+                    }
 
                     // 设置隐藏的默认值
                     document.getElementById('numWorkers').value = '4';
@@ -448,7 +458,7 @@
             <label for="bitworkC">Bitwork C:</label>
             <input type="text" id="bitworkC" name="bitworkC">
         </div>
-        <div class="form-group"  style="display: none;">
+        <div class="form-group">
             <label for="bitworkR">Bitwork R:</label>
             <input type="text" id="bitworkR" name="bitworkR">
         </div>

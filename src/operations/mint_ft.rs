@@ -45,33 +45,22 @@ pub struct Payload {
 }
 
 fn select_utxos(utxos: &[Utxo], target_amount: Amount, fee_rate: f64) -> Result<(Vec<Utxo>, Amount)> {
-    let mut selected_utxos = Vec::new();
-    let mut total_amount = Amount::from_sat(0);
-    
     // 预计输出的脚本类型（假设都是 P2WPKH）
     let output_types = vec![
         ScriptType::P2WPKH, // commit tx 的第一个输出
         ScriptType::P2WPKH, // commit tx 的第二个输出
     ];
     
+    // 找到第一个满足条件的UTXO
     for utxo in utxos {
-        selected_utxos.push(utxo.clone());
+        let mut selected_utxos = vec![utxo.clone()];
         
-        // 处理 Amount 加法
-        total_amount = match total_amount.checked_add(utxo.txout.value) {
-            Some(amount) => amount,
-            None => return Err(Error::TransactionError("Amount overflow".into())),
-        };
-            
         // 获取输入的脚本类型
         let script_type = ScriptType::from_script(&utxo.txout.script_pubkey)
             .ok_or_else(|| Error::TransactionError("Unsupported script type".into()))?;
             
         // 构建输入类型列表
-        let input_types: Vec<ScriptType> = selected_utxos.iter()
-            .map(|u| ScriptType::from_script(&u.txout.script_pubkey)
-                .unwrap_or(ScriptType::P2WPKH))
-            .collect();
+        let input_types = vec![script_type];
             
         // 计算当前交易大小
         let tx_size = tx_size::calculate_tx_size(
@@ -83,18 +72,15 @@ fn select_utxos(utxos: &[Utxo], target_amount: Amount, fee_rate: f64) -> Result<
         // 计算预估手续费
         let fee = Amount::from_sat((tx_size.total_vsize as f64 * fee_rate) as u64);
         
-        // 检查是否已经收集了足够的金额
-        match total_amount.checked_sub(fee) {
-            Some(remaining) => {
-                if remaining >= target_amount {
-                    return Ok((selected_utxos, fee));
-                }
+        // 检查单个UTXO是否满足金额要求
+        if let Some(remaining) = utxo.txout.value.checked_sub(fee) {
+            if remaining >= target_amount {
+                return Ok((selected_utxos, fee));
             }
-            None => continue, // 如果减法溢出，继续尝试下一个 UTXO
         }
     }
     
-    Err(Error::InvalidAmount("Not enough funds to cover amount and fees".into()))
+    Err(Error::InvalidAmount("No single UTXO with sufficient funds found".into()))
 }
 
 pub async fn prepare_commit_reveal_config(
