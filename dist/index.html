@@ -74,6 +74,29 @@
         .loading.visible {
             display: block;
         }
+        .dropdown {
+            position: relative;
+            width: 100%;
+        }
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            width: 100%;
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        .dropdown-content div {
+            padding: 8px;
+            cursor: pointer;
+        }
+        .dropdown-content div:hover {
+            background-color: #f1f1f1;
+        }
     </style>
     <script type="module">
         import init, { AtomicalsWasm } from './atomicals_rs.js';
@@ -257,17 +280,140 @@
             status.className = `status ${type}`;
         }
 
+        // 添加防抖函数
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // 搜索ticker的函数
+        async function searchTicker(value) {
+            const dropdown = document.getElementById('tickerDropdown');
+            dropdown.innerHTML = '';
+            
+            // 添加置顶数据
+            const pinnedData = [
+                {
+                    ticker: 'atom',
+                    atomicalId: '56a8a9d2608366f22bed3e545320a37742c183162e1e3b7eb910d3c83b76fd05i0'
+                },
+                {
+                    ticker: 'wizz',
+                    atomicalId: '266103c14e927f25d423edf608b1fef5a05aa3dca4e6b23d8a38d513f368009ei0'
+                }
+            ];
+
+            // 添加置顶项
+            pinnedData.forEach(record => {
+                const div = document.createElement('div');
+                div.textContent = record.ticker;
+                div.style.backgroundColor = '#f0f8ff'; // 轻微的蓝色背景以区分置顶项
+                div.onclick = () => selectTicker(record);
+                dropdown.appendChild(div);
+            });
+
+            // 如果没有搜索值，只显示置顶项
+            if (!value) {
+                dropdown.style.display = 'block';
+                return;
+            }
+
+            try {
+                const response = await fetch(`https://api.wizz.cash/mint/atomicals?mint_type=ticker&pageSize=100000&sortBy=weight&sortType=asc&ticker=${value}`);
+                const data = await response.json();
+                
+                if (data.success && data.data.records) {
+                    // 过滤掉与置顶项重复的数据
+                    const filteredRecords = data.data.records.filter(record => 
+                        !pinnedData.some(pinned => pinned.ticker === record.ticker)
+                    );
+                    
+                    // 添加分隔线（如果有搜索结果）
+                    if (filteredRecords.length > 0) {
+                        const separator = document.createElement('div');
+                        separator.style.borderTop = '1px solid #ddd';
+                        separator.style.margin = '4px 0';
+                        dropdown.appendChild(separator);
+                    }
+                    
+                    // 添加搜索结果
+                    filteredRecords.forEach(record => {
+                        const div = document.createElement('div');
+                        div.textContent = record.ticker;
+                        div.onclick = () => selectTicker(record);
+                        dropdown.appendChild(div);
+                    });
+                    
+                    dropdown.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error fetching tickers:', error);
+            }
+        }
+
+        // 选择ticker的函数
+        async function selectTicker(record) {
+            const tickInput = document.getElementById('tick');
+            tickInput.value = record.ticker;
+            document.getElementById('tickerDropdown').style.display = 'none';
+
+            try {
+                const timestamp = Date.now();
+                const response = await fetch(`https://eptestnet4.wizz.cash/proxy/blockchain.atomicals.get_ft_info?params=["${record.atomicalId}"]&_=${timestamp}`);
+                const data = await response.json();
+
+                if (data.success && data.response.result) {
+                    const result = data.response.result;
+                    
+                    // 设置Mint Amount和Bitwork C的值
+                    const mintAmountInput = document.getElementById('mintAmount');
+                    const bitworkCInput = document.getElementById('bitworkC');
+                    
+                    mintAmountInput.value = result.$mint_amount || '';
+                    mintAmountInput.disabled = true;
+                    
+                    bitworkCInput.value = result.$mint_bitworkc || '';
+                    bitworkCInput.disabled = true;
+
+                    // 设置隐藏的默认值
+                    document.getElementById('numWorkers').value = '4';
+                    document.getElementById('batchSize').value = '100';
+                }
+            } catch (error) {
+                console.error('Error fetching ticker info:', error);
+            }
+        }
+
         // 将函数暴露到全局作用域
         window.checkWalletAvailability = checkWalletAvailability;
         window.connectWallet = connectWallet;
         window.mintFT = mintFT;
         window.updateStatus = updateStatus;
 
-        // 初始化
-        document.addEventListener('DOMContentLoaded', () => {
+        // 初始化函数
+        window.onload = function() {
             checkWalletAvailability();
             document.getElementById('walletType').addEventListener('change', checkWalletAvailability);
-        });
+            
+            // 添加ticker搜索功能
+            const tickInput = document.getElementById('tick');
+            const debouncedSearch = debounce(searchTicker, 300);
+            tickInput.addEventListener('input', (e) => debouncedSearch(e.target.value));
+            
+            // 点击其他地方时关闭下拉框
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.dropdown')) {
+                    document.getElementById('tickerDropdown').style.display = 'none';
+                }
+            });
+        };
     </script>
 </head>
 <body>
@@ -286,39 +432,35 @@
         </div>
 
         <div class="form-group">
-            <label>Ticker:</label>
-            <input type="text" id="tick" placeholder="e.g., atom" value="wizz" required>
-            <small>3-5 lowercase letters/numbers</small>
+            <label for="tick">Ticker:</label>
+            <div class="dropdown">
+                <input type="text" id="tick" name="tick" placeholder="Enter ticker">
+                <div id="tickerDropdown" class="dropdown-content"></div>
+            </div>
         </div>
 
         <div class="form-group">
-            <label>Mint Amount:</label>
-            <input type="number" id="mintAmount" value="10000" placeholder="e.g., 1000" required>
-            <small>Amount of tokens to mint</small>
+            <label for="mintAmount">Mint Amount:</label>
+            <input type="number" id="mintAmount" name="mintAmount">
         </div>
 
         <div class="form-group">
-            <label>Bitwork C:</label>
-            <input type="text" id="bitworkC" value="8888" placeholder="e.g., abc">
-            <small>Hex string for bitwork C</small>
+            <label for="bitworkC">Bitwork C:</label>
+            <input type="text" id="bitworkC" name="bitworkC">
+        </div>
+        <div class="form-group"  style="display: none;">
+            <label for="bitworkR">Bitwork R:</label>
+            <input type="text" id="bitworkR" name="bitworkR">
         </div>
 
-        <div class="form-group">
-            <label>Bitwork R:</label>
-            <input type="text" id="bitworkR" placeholder="e.g., abc">
-            <small>Hex string for bitwork R</small>
+        <div class="form-group" style="display: none;">
+            <label for="numWorkers">Number of Workers:</label>
+            <input type="number" id="numWorkers" name="numWorkers" value="4">
         </div>
 
-        <div class="form-group">
-            <label>Number of Workers:</label>
-            <input type="number" id="numWorkers" value="4" placeholder="e.g., 4">
-            <small>Number of workers for mining</small>
-        </div>
-
-        <div class="form-group">
-            <label>Batch Size:</label>
-            <input type="number" id="batchSize" value="100" placeholder="e.g., 100">
-            <small>Batch size for mining</small>
+        <div class="form-group" style="display: none;">
+            <label for="batchSize">Batch Size:</label>
+            <input type="number" id="batchSize" name="batchSize" value="100">
         </div>
 
         <button id="mintButton" class="button" onclick="mintFT()" disabled>Mint FT</button>

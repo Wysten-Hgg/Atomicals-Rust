@@ -22,10 +22,10 @@ echo "delete files"
 rm -rf dist/atomicals*
 rm -rf dist/mining_worker.js
 rm -rf dist/worker_entry.js
-
+rm -rf dist/index.html
 echo "Copying files to dist directory..."
 cp -r pkg/* dist/
 cp src/worker_entry.js dist/
-# cp examples/index.html dist/
+cp examples/index.html dist/
 
 echo "Build completed successfully!"
