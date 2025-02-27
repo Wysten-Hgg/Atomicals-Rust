@@ -39,6 +39,7 @@ pub struct PayloadWrapper {
 #[derive(Debug, Serialize)]
 pub struct Payload {
 	pub bitworkc: String,
+    pub bitworkr:String,
 	pub mint_ticker: String,
 	pub nonce: u64,
 	pub time: u64,
@@ -134,6 +135,7 @@ pub async fn mint_ft<W: WalletProvider>(
 
             Payload {
                 bitworkc: config.mint_bitworkc.clone().unwrap_or_else(|| "".to_string()),
+                bitworkr: config.mint_bitworkr.clone().unwrap_or_else(|| "".to_string()),
                 mint_ticker: config.tick.clone(),
                 nonce,
                 time,
@@ -160,7 +162,16 @@ pub async fn mint_ft<W: WalletProvider>(
         1, // 一个输出
         script.len(), // hash_lock script长度
     );
-    let reveal_fee = Amount::from_sat((reveal_size * fee_rate) as u64);
+    let reveal_fee = if config.mint_bitworkr.is_some() {
+        Amount::from_sat((reveal_size * fee_rate * 1.2) as u64) // 增加 20% 的手续费
+    } else {
+        Amount::from_sat((reveal_size * fee_rate) as u64)
+    };
+
+    log!("Calculated reveal fee: {} sats (BitworkR: {})", 
+        reveal_fee.to_sat(), 
+        config.mint_bitworkr.is_some()
+    );
     
     // 计算commit交易输出值（需要考虑reveal交易的输入和输出）
     let commit_output_value = reveal_fee + Amount::from_sat(config.mint_amount.0);
@@ -335,7 +346,7 @@ pub async fn mint_ft<W: WalletProvider>(
     
     // 设置 tap_scripts
     let mut tap_scripts = std::collections::BTreeMap::new();
-    tap_scripts.insert(control_block, (script.clone(), LeafVersion::TapScript));
+    tap_scripts.insert(control_block.clone(), (script.clone(), LeafVersion::TapScript));
     reveal_psbt.inputs[0].tap_scripts = tap_scripts;
     
     log!("Created reveal PSBT with Taproot script");
@@ -353,9 +364,33 @@ pub async fn mint_ft<W: WalletProvider>(
             let mining_result: MiningResult = serde_wasm_bindgen::from_value(mining_result)?;
             if mining_result.success {
                 if let Some(mined_tx) = mining_result.get_transaction() {
-                    reveal_psbt = Psbt::from_unsigned_tx(mined_tx)
-                        .map_err(|e| Error::PsbtError(format!("Failed to create PSBT after mining reveal tx: {}", e)))?;
-                    log!("Reveal transaction mined successfully");
+                    let mut updated_reveal_tx = reveal_tx.clone();
+                
+                // 只从挖矿结果中获取nonce(sequence)字段
+                updated_reveal_tx.input[0].sequence = mined_tx.input[0].sequence;
+                
+                // 重建PSBT，使用更新的交易但保留原始属性
+                let mut new_reveal_psbt = Psbt::from_unsigned_tx(updated_reveal_tx)
+                    .map_err(|e| Error::PsbtError(format!("Failed to create updated PSBT: {}", e)))?;
+                
+                // 手动保留所有重要的PSBT输入信息
+                new_reveal_psbt.inputs[0].witness_utxo = Some(mined_commit_tx.output[0].clone());
+                new_reveal_psbt.inputs[0].witness_script = Some(script.clone());
+                new_reveal_psbt.inputs[0].tap_internal_key = Some(xonly_pubkey);
+                new_reveal_psbt.inputs[0].tap_merkle_root = Some(tap_merkle_root);
+                
+                // 设置 tap_scripts
+                let mut tap_scripts = std::collections::BTreeMap::new();
+                tap_scripts.insert(control_block.clone(), (script.clone(), LeafVersion::TapScript));
+                new_reveal_psbt.inputs[0].tap_scripts = tap_scripts;
+                
+                // 更新PSBT
+                reveal_psbt = new_reveal_psbt;
+                
+                // 详细记录PSBT状态用于调试
+                log!("Reveal PSBT after mining - input count: {}", reveal_psbt.inputs.len());
+                log!("PSBT input sequence: {:?}", reveal_psbt.unsigned_tx.input[0].sequence);
+                log!("PSBT has witness_utxo: {}", reveal_psbt.inputs[0].witness_utxo.is_some());
                 }
             } else {
                 return Err(Error::MiningError("Failed to mine reveal transaction".into()));
@@ -363,6 +398,12 @@ pub async fn mint_ft<W: WalletProvider>(
         }
     }
 
+    // 确保PSBT完整性
+log!("Commit PSBT input count: {}", commit_psbt.inputs.len());
+log!("Commit PSBT has witness_utxo: {}", commit_psbt.inputs[0].witness_utxo.is_some());
+log!("Reveal PSBT input count: {}", reveal_psbt.inputs.len());
+log!("Reveal PSBT has witness_utxo: {}", reveal_psbt.inputs[0].witness_utxo.is_some());
+log!("Reveal PSBT has tap_internal_key: {}", reveal_psbt.inputs[0].tap_internal_key.is_some());
     // Sign transactions
     log!("Signing transactions...");
     let signed_commit = wallet.sign_psbt(commit_psbt).await?;

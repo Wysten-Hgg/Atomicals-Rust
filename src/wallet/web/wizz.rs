@@ -398,12 +398,12 @@ impl WalletProvider for WizzProvider {
 
 impl WizzProvider {
     fn call_wallet_method(&self, method: &str, args: &[JsValue]) -> Result<JsValue> {
-        log!("Calling wallet method: {}", method);
+        // log!("Calling wallet method: {}", method);
         
         let method_fn = Reflect::get(&self.wallet, &JsValue::from_str(method))
             .map_err(|_| Error::WalletError(format!("Method {} not found", method)))?;
         
-        log!("Method found, is_function: {}", method_fn.is_function());
+        // log!("Method found, is_function: {}", method_fn.is_function());
         
         if !method_fn.is_function() {
             log!("Method is not a function, returning as property");
@@ -416,7 +416,7 @@ impl WizzProvider {
             args_array.push(arg);
         }
         
-        log!("Applying method with {} arguments", args_array.length());
+        // log!("Applying method with {} arguments", args_array.length());
         
         let this = JsValue::from(self.wallet.clone());
         let result = method_fn.apply(&this, &args_array)
@@ -425,8 +425,8 @@ impl WizzProvider {
                 Error::WalletError(format!("Failed to call {}: {:?}", method, e))
             })?;
             
-        log!("Method call succeeded, checking if result is Promise");
-        log!("Result type: {:?}", result.js_typeof());
+        // log!("Method call succeeded, checking if result is Promise");
+        // log!("Result type: {:?}", result.js_typeof());
             
         // 检查结果是否是 Promise 实例
         let is_promise = match js_sys::Reflect::get(&result, &JsValue::from_str("then")) {
