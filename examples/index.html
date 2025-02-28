@@ -97,21 +97,37 @@
         .dropdown-content div:hover {
             background-color: #f1f1f1;
         }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
         .tab-nav {
             display: flex;
-            justify-content: space-between;
             margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
         }
         .tab-nav button {
-            background-color: #f0f0f0;
+            background: none;
             border: none;
             padding: 10px 20px;
             font-size: 16px;
             cursor: pointer;
+            margin-right: 10px;
+            position: relative;
         }
         .tab-nav button.active {
+            color: #4CAF50;
+        }
+        .tab-nav button.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 100%;
+            height: 2px;
             background-color: #4CAF50;
-            color: white;
         }
     </style>
     <script type="module">
@@ -488,15 +504,17 @@
         }
 
         function switchTab(tabName) {
-            document.querySelectorAll('.tab-button').forEach(button => {
+            // 移除所有 tab 的 active 类
+            document.querySelectorAll('.tab-nav button').forEach(button => {
                 button.classList.remove('active');
             });
             document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.remove('active');
+                content.style.display = 'none';
             });
 
-            document.querySelector(`.tab-button[onclick*="${tabName}"]`).classList.add('active');
-            document.getElementById(`${tabName}Section`).classList.add('active');
+            // 激活选中的 tab
+            document.querySelector(`.tab-nav button[data-tab="${tabName}"]`).classList.add('active');
+            document.getElementById(`${tabName}Section`).style.display = 'block';
         }
 
         // 将函数暴露到全局作用域
@@ -543,13 +561,13 @@
         </div>
 
         <!-- Tab Navigation -->
-        <div class="tab-navigation">
-            <button class="tab-button active" onclick="switchTab('ft')">FT Minting</button>
-            <button class="tab-button" onclick="switchTab('realm')">Realm Minting</button>
+        <div class="tab-nav">
+            <button class="active" data-tab="ft" onclick="switchTab('ft')">FT Minting</button>
+            <button data-tab="realm" onclick="switchTab('realm')">Realm Minting</button>
         </div>
 
         <!-- FT Minting Section -->
-        <div id="ftSection" class="tab-content active">
+        <div id="ftSection" class="tab-content">
             <div class="form-group">
                 <label for="tick">Ticker:</label>
                 <div class="dropdown">
@@ -594,33 +612,33 @@
             </div>
             <div class="form-group">
                 <label for="realmSatsOutput">Output Amount (sats):</label>
-                <input type="number" id="realmSatsOutput" value="546" min="546">
+                <input type="number" id="realmSatsOutput" value="1000" min="546">
             </div>
             <div class="form-group">
                 <label for="realmBitworkC">Bitwork C (optional):</label>
                 <input type="text" id="realmBitworkC" placeholder="e.g., abc">
             </div>
-            <div class="form-group">
+            <div class="form-group" style="display: none;">
                 <label for="realmBitworkR">Bitwork R (optional):</label>
                 <input type="text" id="realmBitworkR" placeholder="e.g., abc">
             </div>
-            <div class="form-group">
+            <div class="form-group" style="display: none;">
                 <label for="realmContainer">Container (optional):</label>
                 <input type="text" id="realmContainer" placeholder="Container name">
             </div>
-            <div class="form-group">
+            <div class="form-group" style="display: none;">
                 <label for="realmParent">Parent Realm (optional):</label>
                 <input type="text" id="realmParent" placeholder="Parent realm name">
             </div>
-            <div class="form-group">
+            <div class="form-group" style="display: none;">
                 <label for="realmParentOwner">Parent Owner (required if parent is set):</label>
                 <input type="text" id="realmParentOwner" placeholder="Parent owner address">
             </div>
-            <div class="form-group">
+            <div class="form-group" style="display: none;">
                 <label for="realmNumWorkers">Number of Workers:</label>
                 <input type="number" id="realmNumWorkers" value="4" min="1">
             </div>
-            <div class="form-group">
+            <div class="form-group" style="display: none;">
                 <label for="realmBatchSize">Batch Size:</label>
                 <input type="number" id="realmBatchSize" value="1000" min="1">
             </div>
