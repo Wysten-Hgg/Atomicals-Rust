@@ -6,6 +6,7 @@ export class AtomicalsWasm {
   free(): void;
   constructor();
   mint_ft(tick: string, mint_amount: bigint, bitwork_c?: string | null, bitwork_r?: string | null, num_workers?: number | null, batch_size?: number | null): Promise<any>;
+  mint_realm(name: string, sats_output: bigint, bitwork_c?: string | null, bitwork_r?: string | null, container?: string | null, parent?: string | null, parent_owner?: string | null, num_workers?: number | null, batch_size?: number | null): Promise<any>;
 }
 export class MiningOptions {
   free(): void;
@@ -24,6 +25,23 @@ export class WasmBitworkInfo {
   get_prefix(): string;
   get_ext(): string | undefined;
   set_ext(ext?: string | null): void;
+}
+export class WasmRealmConfig {
+  free(): void;
+  constructor(name: string);
+  with_bitworkc(bitworkc: string): WasmRealmConfig;
+  with_bitworkr(bitworkr: string): WasmRealmConfig;
+  with_container(container: string): WasmRealmConfig;
+  with_parent(parent: string, parent_owner?: string | null): WasmRealmConfig;
+  with_sats_output(sats: bigint): WasmRealmConfig;
+  validate(): void;
+  readonly name: string;
+  readonly bitworkc: string | undefined;
+  readonly bitworkr: string | undefined;
+  readonly container: string | undefined;
+  readonly parent: string | undefined;
+  readonly parent_owner: string | undefined;
+  readonly sats_output: bigint;
 }
 export class WasmTransaction {
   free(): void;
@@ -59,6 +77,21 @@ export interface InitOutput {
   readonly wasmbitworkinfo_get_prefix: (a: number) => [number, number];
   readonly wasmbitworkinfo_get_ext: (a: number) => [number, number];
   readonly wasmbitworkinfo_set_ext: (a: number, b: number, c: number) => void;
+  readonly __wbg_wasmrealmconfig_free: (a: number, b: number) => void;
+  readonly wasmrealmconfig_new: (a: number, b: number) => number;
+  readonly wasmrealmconfig_name: (a: number) => [number, number];
+  readonly wasmrealmconfig_bitworkc: (a: number) => [number, number];
+  readonly wasmrealmconfig_bitworkr: (a: number) => [number, number];
+  readonly wasmrealmconfig_container: (a: number) => [number, number];
+  readonly wasmrealmconfig_parent: (a: number) => [number, number];
+  readonly wasmrealmconfig_parent_owner: (a: number) => [number, number];
+  readonly wasmrealmconfig_sats_output: (a: number) => bigint;
+  readonly wasmrealmconfig_with_bitworkc: (a: number, b: number, c: number) => number;
+  readonly wasmrealmconfig_with_bitworkr: (a: number, b: number, c: number) => number;
+  readonly wasmrealmconfig_with_container: (a: number, b: number, c: number) => number;
+  readonly wasmrealmconfig_with_parent: (a: number, b: number, c: number, d: number, e: number) => number;
+  readonly wasmrealmconfig_with_sats_output: (a: number, b: bigint) => number;
+  readonly wasmrealmconfig_validate: (a: number) => [number, number];
   readonly __wbg_unisatprovider_free: (a: number, b: number) => void;
   readonly unisatprovider_try_new: () => [number, number, number];
   readonly __wbg_wizzprovider_free: (a: number, b: number) => void;
@@ -66,6 +99,7 @@ export interface InitOutput {
   readonly __wbg_atomicalswasm_free: (a: number, b: number) => void;
   readonly atomicalswasm_try_new: () => [number, number, number];
   readonly atomicalswasm_mint_ft: (a: number, b: number, c: number, d: bigint, e: number, f: number, g: number, h: number, i: number, j: number) => any;
+  readonly atomicalswasm_mint_realm: (a: number, b: number, c: number, d: bigint, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number) => any;
   readonly wasmtransaction_new: (a: number, b: number) => number;
   readonly rustsecp256k1_v0_9_2_context_create: (a: number) => number;
   readonly rustsecp256k1_v0_9_2_context_destroy: (a: number) => void;
@@ -81,8 +115,8 @@ export interface InitOutput {
   readonly __externref_table_dealloc: (a: number) => void;
   readonly closure5_externref_shim: (a: number, b: number, c: any) => void;
   readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h34ced8d1dcb0005d: (a: number, b: number) => void;
-  readonly closure233_externref_shim: (a: number, b: number, c: any) => void;
-  readonly closure297_externref_shim: (a: number, b: number, c: any, d: any) => void;
+  readonly closure239_externref_shim: (a: number, b: number, c: any) => void;
+  readonly closure303_externref_shim: (a: number, b: number, c: any, d: any) => void;
   readonly __wbindgen_start: () => void;
 }
 

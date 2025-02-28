@@ -249,11 +249,11 @@ function __wbg_adapter_47(arg0, arg1) {
 }
 
 function __wbg_adapter_52(arg0, arg1, arg2) {
-    wasm.closure233_externref_shim(arg0, arg1, arg2);
+    wasm.closure239_externref_shim(arg0, arg1, arg2);
 }
 
-function __wbg_adapter_201(arg0, arg1, arg2, arg3) {
-    wasm.closure297_externref_shim(arg0, arg1, arg2, arg3);
+function __wbg_adapter_216(arg0, arg1, arg2, arg3) {
+    wasm.closure303_externref_shim(arg0, arg1, arg2, arg3);
 }
 
 const __wbindgen_enum_RequestCredentials = ["omit", "same-origin", "include"];
@@ -303,6 +303,34 @@ export class AtomicalsWasm {
         var ptr2 = isLikeNone(bitwork_r) ? 0 : passStringToWasm0(bitwork_r, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         var len2 = WASM_VECTOR_LEN;
         const ret = wasm.atomicalswasm_mint_ft(this.__wbg_ptr, ptr0, len0, mint_amount, ptr1, len1, ptr2, len2, isLikeNone(num_workers) ? 0x100000001 : (num_workers) >>> 0, isLikeNone(batch_size) ? 0x100000001 : (batch_size) >>> 0);
+        return ret;
+    }
+    /**
+     * @param {string} name
+     * @param {bigint} sats_output
+     * @param {string | null} [bitwork_c]
+     * @param {string | null} [bitwork_r]
+     * @param {string | null} [container]
+     * @param {string | null} [parent]
+     * @param {string | null} [parent_owner]
+     * @param {number | null} [num_workers]
+     * @param {number | null} [batch_size]
+     * @returns {Promise<any>}
+     */
+    mint_realm(name, sats_output, bitwork_c, bitwork_r, container, parent, parent_owner, num_workers, batch_size) {
+        const ptr0 = passStringToWasm0(name, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        var ptr1 = isLikeNone(bitwork_c) ? 0 : passStringToWasm0(bitwork_c, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len1 = WASM_VECTOR_LEN;
+        var ptr2 = isLikeNone(bitwork_r) ? 0 : passStringToWasm0(bitwork_r, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len2 = WASM_VECTOR_LEN;
+        var ptr3 = isLikeNone(container) ? 0 : passStringToWasm0(container, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len3 = WASM_VECTOR_LEN;
+        var ptr4 = isLikeNone(parent) ? 0 : passStringToWasm0(parent, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len4 = WASM_VECTOR_LEN;
+        var ptr5 = isLikeNone(parent_owner) ? 0 : passStringToWasm0(parent_owner, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len5 = WASM_VECTOR_LEN;
+        const ret = wasm.atomicalswasm_mint_realm(this.__wbg_ptr, ptr0, len0, sats_output, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5, isLikeNone(num_workers) ? 0x100000001 : (num_workers) >>> 0, isLikeNone(batch_size) ? 0x100000001 : (batch_size) >>> 0);
         return ret;
     }
 }
@@ -466,6 +494,188 @@ export class WasmBitworkInfo {
         var ptr0 = isLikeNone(ext) ? 0 : passStringToWasm0(ext, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         var len0 = WASM_VECTOR_LEN;
         wasm.wasmbitworkinfo_set_ext(this.__wbg_ptr, ptr0, len0);
+    }
+}
+
+const WasmRealmConfigFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_wasmrealmconfig_free(ptr >>> 0, 1));
+
+export class WasmRealmConfig {
+
+    static __wrap(ptr) {
+        ptr = ptr >>> 0;
+        const obj = Object.create(WasmRealmConfig.prototype);
+        obj.__wbg_ptr = ptr;
+        WasmRealmConfigFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        WasmRealmConfigFinalization.unregister(this);
+        return ptr;
+    }
+
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_wasmrealmconfig_free(ptr, 0);
+    }
+    /**
+     * @param {string} name
+     */
+    constructor(name) {
+        const ptr0 = passStringToWasm0(name, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.wasmrealmconfig_new(ptr0, len0);
+        this.__wbg_ptr = ret >>> 0;
+        WasmRealmConfigFinalization.register(this, this.__wbg_ptr, this);
+        return this;
+    }
+    /**
+     * @returns {string}
+     */
+    get name() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.wasmrealmconfig_name(this.__wbg_ptr);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
+     * @returns {string | undefined}
+     */
+    get bitworkc() {
+        const ret = wasm.wasmrealmconfig_bitworkc(this.__wbg_ptr);
+        let v1;
+        if (ret[0] !== 0) {
+            v1 = getStringFromWasm0(ret[0], ret[1]).slice();
+            wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        }
+        return v1;
+    }
+    /**
+     * @returns {string | undefined}
+     */
+    get bitworkr() {
+        const ret = wasm.wasmrealmconfig_bitworkr(this.__wbg_ptr);
+        let v1;
+        if (ret[0] !== 0) {
+            v1 = getStringFromWasm0(ret[0], ret[1]).slice();
+            wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        }
+        return v1;
+    }
+    /**
+     * @returns {string | undefined}
+     */
+    get container() {
+        const ret = wasm.wasmrealmconfig_container(this.__wbg_ptr);
+        let v1;
+        if (ret[0] !== 0) {
+            v1 = getStringFromWasm0(ret[0], ret[1]).slice();
+            wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        }
+        return v1;
+    }
+    /**
+     * @returns {string | undefined}
+     */
+    get parent() {
+        const ret = wasm.wasmrealmconfig_parent(this.__wbg_ptr);
+        let v1;
+        if (ret[0] !== 0) {
+            v1 = getStringFromWasm0(ret[0], ret[1]).slice();
+            wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        }
+        return v1;
+    }
+    /**
+     * @returns {string | undefined}
+     */
+    get parent_owner() {
+        const ret = wasm.wasmrealmconfig_parent_owner(this.__wbg_ptr);
+        let v1;
+        if (ret[0] !== 0) {
+            v1 = getStringFromWasm0(ret[0], ret[1]).slice();
+            wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        }
+        return v1;
+    }
+    /**
+     * @returns {bigint}
+     */
+    get sats_output() {
+        const ret = wasm.wasmrealmconfig_sats_output(this.__wbg_ptr);
+        return BigInt.asUintN(64, ret);
+    }
+    /**
+     * @param {string} bitworkc
+     * @returns {WasmRealmConfig}
+     */
+    with_bitworkc(bitworkc) {
+        const ptr = this.__destroy_into_raw();
+        const ptr0 = passStringToWasm0(bitworkc, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.wasmrealmconfig_with_bitworkc(ptr, ptr0, len0);
+        return WasmRealmConfig.__wrap(ret);
+    }
+    /**
+     * @param {string} bitworkr
+     * @returns {WasmRealmConfig}
+     */
+    with_bitworkr(bitworkr) {
+        const ptr = this.__destroy_into_raw();
+        const ptr0 = passStringToWasm0(bitworkr, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.wasmrealmconfig_with_bitworkr(ptr, ptr0, len0);
+        return WasmRealmConfig.__wrap(ret);
+    }
+    /**
+     * @param {string} container
+     * @returns {WasmRealmConfig}
+     */
+    with_container(container) {
+        const ptr = this.__destroy_into_raw();
+        const ptr0 = passStringToWasm0(container, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.wasmrealmconfig_with_container(ptr, ptr0, len0);
+        return WasmRealmConfig.__wrap(ret);
+    }
+    /**
+     * @param {string} parent
+     * @param {string | null} [parent_owner]
+     * @returns {WasmRealmConfig}
+     */
+    with_parent(parent, parent_owner) {
+        const ptr = this.__destroy_into_raw();
+        const ptr0 = passStringToWasm0(parent, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        var ptr1 = isLikeNone(parent_owner) ? 0 : passStringToWasm0(parent_owner, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len1 = WASM_VECTOR_LEN;
+        const ret = wasm.wasmrealmconfig_with_parent(ptr, ptr0, len0, ptr1, len1);
+        return WasmRealmConfig.__wrap(ret);
+    }
+    /**
+     * @param {bigint} sats
+     * @returns {WasmRealmConfig}
+     */
+    with_sats_output(sats) {
+        const ptr = this.__destroy_into_raw();
+        const ret = wasm.wasmrealmconfig_with_sats_output(ptr, sats);
+        return WasmRealmConfig.__wrap(ret);
+    }
+    validate() {
+        const ret = wasm.wasmrealmconfig_validate(this.__wbg_ptr);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
     }
 }
 
@@ -767,7 +977,7 @@ function __wbg_get_imports() {
                 const a = state0.a;
                 state0.a = 0;
                 try {
-                    return __wbg_adapter_201(a, state0.b, arg0, arg1);
+                    return __wbg_adapter_216(a, state0.b, arg0, arg1);
                 } finally {
                     state0.a = a;
                 }
@@ -964,8 +1174,8 @@ function __wbg_get_imports() {
         const ret = false;
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper1190 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 234, __wbg_adapter_52);
+    imports.wbg.__wbindgen_closure_wrapper1232 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 240, __wbg_adapter_52);
         return ret;
     };
     imports.wbg.__wbindgen_closure_wrapper153 = function(arg0, arg1, arg2) {

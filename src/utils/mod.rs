@@ -9,7 +9,6 @@ pub mod script;
 
 pub use tx_size::*;
 pub use script::*;
-
 pub fn validate_ticker(ticker: &str) -> bool {
     // Ticker rules:
     // 1. Length between 1 and 21 characters

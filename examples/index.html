@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Atomicals FT Minting</title>
+    <title>Atomicals FT & Realm Minting</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -96,6 +96,22 @@
         }
         .dropdown-content div:hover {
             background-color: #f1f1f1;
+        }
+        .tab-nav {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .tab-nav button {
+            background-color: #f0f0f0;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .tab-nav button.active {
+            background-color: #4CAF50;
+            color: white;
         }
     </style>
     <script type="module">
@@ -274,6 +290,76 @@
             }
         }
 
+        async function mintRealm() {
+            if (!state.isConnected) {
+                updateStatus('Please connect wallet first', 'error');
+                return;
+            }
+
+            const mintButton = document.getElementById('mintRealmButton');
+            const loading = document.getElementById('loading');
+            
+            try {
+                // 检查钱包是否已安装和就绪
+                if (!await checkWalletStatus()) {
+                    throw new Error(`${state.currentWallet.toUpperCase()} wallet is not installed or not ready. Please install it and refresh the page.`);
+                }
+
+                // 获取输入值
+                const name = document.getElementById('realmName').value;
+                const satsOutput = BigInt(document.getElementById('realmSatsOutput').value);
+                const bitworkC = document.getElementById('realmBitworkC').value || null;
+                const bitworkR = document.getElementById('realmBitworkR').value || null;
+                const container = document.getElementById('realmContainer').value || null;
+                const parent = document.getElementById('realmParent').value || null;
+                const parentOwner = document.getElementById('realmParentOwner').value || null;
+                const numWorkers = parseInt(document.getElementById('realmNumWorkers').value);
+                const batchSize = parseInt(document.getElementById('realmBatchSize').value);
+
+                // 基本验证
+                if (!name) throw new Error('Realm name is required');
+                if (satsOutput < 546n) throw new Error('Output amount must be at least 546 sats');
+                if (parent && !parentOwner) throw new Error('Parent owner is required when parent realm is specified');
+
+                // 显示加载状态
+                loading.classList.add('visible');
+                mintButton.disabled = true;
+
+                // 创建 WASM 实例
+                console.log('Creating WASM instance...');
+                const atomicals = new AtomicalsWasm();
+                console.log('WASM instance created');
+
+                // 调用 mint_realm 函数
+                console.log('Starting mint_realm with:', {
+                    name, satsOutput, bitworkC, bitworkR,
+                    container, parent, parentOwner,
+                    numWorkers, batchSize
+                });
+
+                const result = await atomicals.mint_realm(
+                    name,
+                    satsOutput,
+                    bitworkC,
+                    bitworkR,
+                    container,
+                    parent,
+                    parentOwner,
+                    numWorkers,
+                    batchSize
+                );
+
+                console.log('Mint result:', result);
+                updateStatus(`Realm minted successfully!`, 'success');
+            } catch (error) {
+                console.error('Minting error:', error);
+                updateStatus(`Failed to mint realm: ${error.message}`, 'error');
+            } finally {
+                loading.classList.remove('visible');
+                mintButton.disabled = false;
+            }
+        }
+
         function updateStatus(message, type) {
             const status = document.getElementById('status');
             status.textContent = message;
@@ -401,11 +487,25 @@
             }
         }
 
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+
+            document.querySelector(`.tab-button[onclick*="${tabName}"]`).classList.add('active');
+            document.getElementById(`${tabName}Section`).classList.add('active');
+        }
+
         // 将函数暴露到全局作用域
         window.checkWalletAvailability = checkWalletAvailability;
         window.connectWallet = connectWallet;
         window.mintFT = mintFT;
+        window.mintRealm = mintRealm;
         window.updateStatus = updateStatus;
+        window.switchTab = switchTab;
 
         // 初始化函数
         window.onload = function() {
@@ -428,8 +528,9 @@
 </head>
 <body>
     <div class="container">
-        <h1>Atomicals FT Minting</h1>
+        <h1>Atomicals FT & Realm Minting</h1>
         
+        <!-- Wallet Connection Section -->
         <div class="wallet-section">
             <div class="form-group">
                 <label>Select Wallet:</label>
@@ -441,45 +542,93 @@
             <button id="connectWallet" class="button connect" onclick="connectWallet()">Connect Wallet</button>
         </div>
 
-        <div class="form-group">
-            <label for="tick">Ticker:</label>
-            <div class="dropdown">
-                <input type="text" id="tick" name="tick" placeholder="Enter ticker">
-                <div id="tickerDropdown" class="dropdown-content"></div>
+        <!-- Tab Navigation -->
+        <div class="tab-navigation">
+            <button class="tab-button active" onclick="switchTab('ft')">FT Minting</button>
+            <button class="tab-button" onclick="switchTab('realm')">Realm Minting</button>
+        </div>
+
+        <!-- FT Minting Section -->
+        <div id="ftSection" class="tab-content active">
+            <div class="form-group">
+                <label for="tick">Ticker:</label>
+                <div class="dropdown">
+                    <input type="text" id="tick" name="tick" placeholder="Enter ticker">
+                    <div id="tickerDropdown" class="dropdown-content"></div>
+                </div>
             </div>
+
+            <div class="form-group">
+                <label for="mintAmount">Mint Amount:</label>
+                <input type="number" id="mintAmount" name="mintAmount">
+            </div>
+
+            <div class="form-group">
+                <label for="bitworkC">Bitwork C:</label>
+                <input type="text" id="bitworkC" name="bitworkC">
+            </div>
+            <div class="form-group">
+                <label for="bitworkR">Bitwork R:</label>
+                <input type="text" id="bitworkR" name="bitworkR">
+            </div>
+
+            <div class="form-group" style="display: none;">
+                <label for="numWorkers">Number of Workers:</label>
+                <input type="number" id="numWorkers" name="numWorkers" value="4">
+            </div>
+
+            <div class="form-group" style="display: none;">
+                <label for="batchSize">Batch Size:</label>
+                <input type="number" id="batchSize" name="batchSize" value="100">
+            </div>
+
+            <button id="mintButton" class="button" onclick="mintFT()" disabled>Mint FT</button>
         </div>
 
-        <div class="form-group">
-            <label for="mintAmount">Mint Amount:</label>
-            <input type="number" id="mintAmount" name="mintAmount">
-        </div>
-
-        <div class="form-group">
-            <label for="bitworkC">Bitwork C:</label>
-            <input type="text" id="bitworkC" name="bitworkC">
-        </div>
-        <div class="form-group">
-            <label for="bitworkR">Bitwork R:</label>
-            <input type="text" id="bitworkR" name="bitworkR">
-        </div>
-
-        <div class="form-group" style="display: none;">
-            <label for="numWorkers">Number of Workers:</label>
-            <input type="number" id="numWorkers" name="numWorkers" value="4">
-        </div>
-
-        <div class="form-group" style="display: none;">
-            <label for="batchSize">Batch Size:</label>
-            <input type="number" id="batchSize" name="batchSize" value="100">
-        </div>
-
-        <button id="mintButton" class="button" onclick="mintFT()" disabled>Mint FT</button>
-
-        <div id="loading" class="loading">
-            Minting in progress... Please wait and approve the transaction in your wallet.
+        <!-- Realm Minting Section -->
+        <div id="realmSection" class="tab-content">
+            <h2>Realm Minting</h2>
+            <div class="form-group">
+                <label for="realmName">Realm Name:</label>
+                <input type="text" id="realmName" placeholder="Enter realm name">
+            </div>
+            <div class="form-group">
+                <label for="realmSatsOutput">Output Amount (sats):</label>
+                <input type="number" id="realmSatsOutput" value="546" min="546">
+            </div>
+            <div class="form-group">
+                <label for="realmBitworkC">Bitwork C (optional):</label>
+                <input type="text" id="realmBitworkC" placeholder="e.g., abc">
+            </div>
+            <div class="form-group">
+                <label for="realmBitworkR">Bitwork R (optional):</label>
+                <input type="text" id="realmBitworkR" placeholder="e.g., abc">
+            </div>
+            <div class="form-group">
+                <label for="realmContainer">Container (optional):</label>
+                <input type="text" id="realmContainer" placeholder="Container name">
+            </div>
+            <div class="form-group">
+                <label for="realmParent">Parent Realm (optional):</label>
+                <input type="text" id="realmParent" placeholder="Parent realm name">
+            </div>
+            <div class="form-group">
+                <label for="realmParentOwner">Parent Owner (required if parent is set):</label>
+                <input type="text" id="realmParentOwner" placeholder="Parent owner address">
+            </div>
+            <div class="form-group">
+                <label for="realmNumWorkers">Number of Workers:</label>
+                <input type="number" id="realmNumWorkers" value="4" min="1">
+            </div>
+            <div class="form-group">
+                <label for="realmBatchSize">Batch Size:</label>
+                <input type="number" id="realmBatchSize" value="1000" min="1">
+            </div>
+            <button id="mintRealmButton" class="button" onclick="mintRealm()">Mint Realm</button>
         </div>
 
         <div id="status" class="status"></div>
+        <div id="loading" class="loading">Mining in progress...</div>
     </div>
 </body>
 </html>

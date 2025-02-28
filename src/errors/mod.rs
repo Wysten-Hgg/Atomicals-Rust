@@ -27,6 +27,10 @@ pub enum Error {
     AsyncError(String),
     InvalidInput(String),
     DatabaseError(String),
+    RealmNameInvalid(String),
+    ParentRealmNotFound(String),
+    ContainerNotFound(String),
+    ParentOwnerInvalid(String),
     Other(String),
 }
 
@@ -55,6 +59,10 @@ impl fmt::Display for Error {
             Error::AsyncError(msg) => write!(f, "Async error: {}", msg),
             Error::InvalidInput(msg) => write!(f, "Invalid input: {}", msg),
             Error::DatabaseError(msg) => write!(f, "Database error: {}", msg),
+            Error::RealmNameInvalid(msg) => write!(f, "Invalid realm name: {}", msg),
+            Error::ParentRealmNotFound(msg) => write!(f, "Parent realm not found: {}", msg),
+            Error::ContainerNotFound(msg) => write!(f, "Container not found: {}", msg),
+            Error::ParentOwnerInvalid(msg) => write!(f, "Invalid parent owner: {}", msg),
             Error::Other(msg) => write!(f, "Other error: {}", msg),
         }
     }
