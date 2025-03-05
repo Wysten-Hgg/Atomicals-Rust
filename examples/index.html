@@ -376,6 +376,82 @@
             }
         }
 
+        async function mintSubrealm() {
+            if (!state.isConnected) {
+                updateStatus('Please connect wallet first', 'error');
+                return;
+            }
+
+            const mintButton = document.getElementById('mintSubrealmButton');
+            const loading = document.getElementById('loading');
+            
+            try {
+                // 检查钱包是否已安装和就绪
+                if (!await checkWalletStatus()) {
+                    throw new Error(`${state.currentWallet.toUpperCase()} wallet is not installed or not ready. Please install it and refresh the page.`);
+                }
+
+                // 获取输入值
+                const name = document.getElementById('subrealmName').value;
+                const parentRealmId = document.getElementById('parentRealmId').value;
+                const claimType = document.getElementById('claimType').value;
+                const satsOutput = BigInt(document.getElementById('subrealmSatsOutput').value);
+                const bitworkC = document.getElementById('subrealmBitworkC').value || null;
+                const bitworkR = document.getElementById('subrealmBitworkR').value || null;
+                const container = document.getElementById('subrealmContainer').value || null;
+                const meta = document.getElementById('subrealmMeta').value || null;
+                const ctx = document.getElementById('subrealmCtx').value || null;
+                const init = document.getElementById('subrealmInit').value || null;
+                const numWorkers = parseInt(document.getElementById('subrealmNumWorkers').value);
+                const batchSize = parseInt(document.getElementById('subrealmBatchSize').value);
+
+                // 基本验证
+                if (!name) throw new Error('Subrealm name is required');
+                if (!parentRealmId) throw new Error('Parent realm ID is required');
+                if (satsOutput < 546n) throw new Error('Output amount must be at least 546 sats');
+
+                // 显示加载状态
+                loading.classList.add('visible');
+                mintButton.disabled = true;
+
+                // 创建 WASM 实例
+                console.log('Creating WASM instance...');
+                const atomicals = new AtomicalsWasm();
+                console.log('WASM instance created');
+
+                // 调用 mint_subrealm 函数
+                console.log('Starting mint_subrealm with:', {
+                    name, parentRealmId, claimType, satsOutput, bitworkC, bitworkR,
+                    container, meta, ctx, init,
+                    numWorkers, batchSize
+                });
+
+                const result = await atomicals.mint_subrealm(
+                    name,
+                    parentRealmId,
+                    claimType,
+                    satsOutput,
+                    bitworkC,
+                    bitworkR,
+                    container,
+                    meta,
+                    ctx,
+                    init,
+                    numWorkers,
+                    batchSize
+                );
+
+                console.log('Mint result:', result);
+                updateStatus(`Subrealm minted successfully!`, 'success');
+            } catch (error) {
+                console.error('Minting error:', error);
+                updateStatus(`Failed to mint subrealm: ${error.message}`, 'error');
+            } finally {
+                loading.classList.remove('visible');
+                mintButton.disabled = false;
+            }
+        }
+
         function updateStatus(message, type) {
             const status = document.getElementById('status');
             status.textContent = message;
@@ -522,6 +598,7 @@
         window.connectWallet = connectWallet;
         window.mintFT = mintFT;
         window.mintRealm = mintRealm;
+        window.mintSubrealm = mintSubrealm;
         window.updateStatus = updateStatus;
         window.switchTab = switchTab;
 
@@ -564,6 +641,7 @@
         <div class="tab-nav">
             <button class="active" data-tab="ft" onclick="switchTab('ft')">FT Minting</button>
             <button data-tab="realm" onclick="switchTab('realm')">Realm Minting</button>
+            <button data-tab="subrealm" onclick="switchTab('subrealm')">Subrealm Minting</button>
         </div>
 
         <!-- FT Minting Section -->
@@ -643,6 +721,62 @@
                 <input type="number" id="realmBatchSize" value="1000" min="1">
             </div>
             <button id="mintRealmButton" class="button" onclick="mintRealm()">Mint Realm</button>
+        </div>
+
+        <div id="subrealmSection" class="tab-content">
+            <h2>Subrealm Minting</h2>
+            <div class="form-group">
+                <label for="subrealmName">Subrealm Name:</label>
+                <input type="text" id="subrealmName" placeholder="Enter subrealm name">
+            </div>
+            <div class="form-group">
+                <label for="parentRealmId">Parent Realm ID:</label>
+                <input type="text" id="parentRealmId" placeholder="Enter parent realm ID">
+            </div>
+            <div class="form-group">
+                <label for="claimType">Claim Type:</label>
+                <select id="claimType">
+                    <option value="direct">Direct</option>
+                    <option value="rule">Rule</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="subrealmSatsOutput">Output Amount (sats):</label>
+                <input type="number" id="subrealmSatsOutput" value="1000" min="546">
+            </div>
+            <div class="form-group">
+                <label for="subrealmBitworkC">Bitwork C (optional):</label>
+                <input type="text" id="subrealmBitworkC" placeholder="e.g., abc">
+            </div>
+            <div class="form-group">
+                <label for="subrealmBitworkR">Bitwork R (optional):</label>
+                <input type="text" id="subrealmBitworkR" placeholder="e.g., abc">
+            </div>
+            <div class="form-group">
+                <label for="subrealmContainer">Container (optional):</label>
+                <input type="text" id="subrealmContainer" placeholder="Container name">
+            </div>
+            <div class="form-group" style="display: none;">
+                <label for="subrealmMeta">Meta (optional JSON):</label>
+                <input type="text" id="subrealmMeta" placeholder='{"key": "value"}'>
+            </div>
+            <div class="form-group" style="display: none;">
+                <label for="subrealmCtx">Context (optional JSON):</label>
+                <input type="text" id="subrealmCtx" placeholder='{"key": "value"}'>
+            </div>
+            <div class="form-group" style="display: none;">
+                <label for="subrealmInit">Init (optional JSON):</label>
+                <input type="text" id="subrealmInit" placeholder='{"key": "value"}'>
+            </div>
+            <div class="form-group" style="display: none;">
+                <label for="subrealmNumWorkers">Number of Workers:</label>
+                <input type="number" id="subrealmNumWorkers" value="4" min="1">
+            </div>
+            <div class="form-group" style="display: none;">
+                <label for="subrealmBatchSize">Batch Size:</label>
+                <input type="number" id="subrealmBatchSize" value="1000" min="1">
+            </div>
+            <button id="mintSubrealmButton" class="button" onclick="mintSubrealm()">Mint Subrealm</button>
         </div>
 
         <div id="status" class="status"></div>

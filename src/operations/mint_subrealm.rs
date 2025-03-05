@@ -40,14 +40,17 @@ pub struct PayloadWrapper {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Payload {
-    pub bitworkc: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bitworkc: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bitworkr: Option<String>,
     pub request_subrealm: String,
     pub parent_realm: String,
     pub claim_type: String,
-    pub nonce: u64,
-    pub time: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub time: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub container: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -174,42 +177,40 @@ pub async fn mint_subrealm<W: WalletProvider>(
     let pubkey = wallet.get_public_key().await?;
     let (xonly_pubkey, _parity) = pubkey.inner.x_only_public_key();
 
-    // 检查父 Realm 所有权（仅对于直接铸造）
-    if config.claim_type == SubrealmClaimType::Direct {
-        // 验证父 Realm 所有权
-        match verify_parent_realm_ownership(wallet, &config.parent_realm_id).await? {
-            Some(address) => {
-                log!("Verified ownership of parent realm: {} (address: {})", config.parent_realm_id, address);
-            },
-            None => return Err(Error::OwnershipError(format!("Parent realm {} is not owned by the current wallet", config.parent_realm_id))),
-        }
-    } else {
-        // 对于规则铸造，我们不需要拥有父 Realm
-        // TODO: 获取父 Realm 的铸造规则并验证
-        return Err(Error::NotImplemented("Rule-based subrealm minting is not yet implemented".into()));
-    }
-
     // 构建 atomicals payload
     let payload = PayloadWrapper {
         args: {
-            let (time, nonce) = time_nonce();
-            Payload {
-                bitworkc: config.bitworkc.clone().unwrap_or_else(|| "".to_string()),
-                bitworkr: if config.bitworkr.is_some() {
-                    Some(config.bitworkr.clone().unwrap())
-                } else {
-                    None
-                },
+            let mut payload = Payload {
                 request_subrealm: subrealm_part.to_string(),
                 parent_realm: config.parent_realm_id.clone(),
                 claim_type: config.claim_type.as_str().to_string(),
-                nonce,
-                time,
-                container: config.container,
-                meta: config.meta,
-                ctx: config.ctx,
-                init: config.init,
+                nonce: None,
+                time: None,
+                bitworkc: None,
+                bitworkr: None,
+                container: config.container.clone(),
+                meta: config.meta.clone(),
+                ctx: config.ctx.clone(),
+                init: config.init.clone(),
+            };
+            
+            // 对于非直接铸造类型，添加额外字段
+            if config.claim_type != SubrealmClaimType::Direct {
+                let (time, nonce) = time_nonce();
+                payload.time = Some(time);
+                payload.nonce = Some(nonce);
             }
+            
+            // 添加可选的 bitwork 字段
+            if let Some(bitworkc) = &config.bitworkc {
+                payload.bitworkc = Some(bitworkc.clone());
+            }
+            
+            if let Some(bitworkr) = &config.bitworkr {
+                payload.bitworkr = Some(bitworkr.to_string());
+            }
+            
+            payload
         },
     };
     
