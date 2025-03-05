@@ -249,11 +249,11 @@ function __wbg_adapter_47(arg0, arg1) {
 }
 
 function __wbg_adapter_52(arg0, arg1, arg2) {
-    wasm.closure239_externref_shim(arg0, arg1, arg2);
+    wasm.closure247_externref_shim(arg0, arg1, arg2);
 }
 
-function __wbg_adapter_216(arg0, arg1, arg2, arg3) {
-    wasm.closure303_externref_shim(arg0, arg1, arg2, arg3);
+function __wbg_adapter_217(arg0, arg1, arg2, arg3) {
+    wasm.closure311_externref_shim(arg0, arg1, arg2, arg3);
 }
 
 const __wbindgen_enum_RequestCredentials = ["omit", "same-origin", "include"];
@@ -331,6 +331,43 @@ export class AtomicalsWasm {
         var ptr5 = isLikeNone(parent_owner) ? 0 : passStringToWasm0(parent_owner, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         var len5 = WASM_VECTOR_LEN;
         const ret = wasm.atomicalswasm_mint_realm(this.__wbg_ptr, ptr0, len0, sats_output, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5, isLikeNone(num_workers) ? 0x100000001 : (num_workers) >>> 0, isLikeNone(batch_size) ? 0x100000001 : (batch_size) >>> 0);
+        return ret;
+    }
+    /**
+     * @param {string} name
+     * @param {string} parent_realm_id
+     * @param {string} claim_type
+     * @param {bigint} sats_output
+     * @param {string | null} [bitwork_c]
+     * @param {string | null} [bitwork_r]
+     * @param {string | null} [container]
+     * @param {string | null} [meta]
+     * @param {string | null} [ctx]
+     * @param {string | null} [init]
+     * @param {number | null} [num_workers]
+     * @param {number | null} [batch_size]
+     * @returns {Promise<any>}
+     */
+    mint_subrealm(name, parent_realm_id, claim_type, sats_output, bitwork_c, bitwork_r, container, meta, ctx, init, num_workers, batch_size) {
+        const ptr0 = passStringToWasm0(name, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(parent_realm_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passStringToWasm0(claim_type, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len2 = WASM_VECTOR_LEN;
+        var ptr3 = isLikeNone(bitwork_c) ? 0 : passStringToWasm0(bitwork_c, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len3 = WASM_VECTOR_LEN;
+        var ptr4 = isLikeNone(bitwork_r) ? 0 : passStringToWasm0(bitwork_r, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len4 = WASM_VECTOR_LEN;
+        var ptr5 = isLikeNone(container) ? 0 : passStringToWasm0(container, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len5 = WASM_VECTOR_LEN;
+        var ptr6 = isLikeNone(meta) ? 0 : passStringToWasm0(meta, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len6 = WASM_VECTOR_LEN;
+        var ptr7 = isLikeNone(ctx) ? 0 : passStringToWasm0(ctx, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len7 = WASM_VECTOR_LEN;
+        var ptr8 = isLikeNone(init) ? 0 : passStringToWasm0(init, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len8 = WASM_VECTOR_LEN;
+        const ret = wasm.atomicalswasm_mint_subrealm(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2, sats_output, ptr3, len3, ptr4, len4, ptr5, len5, ptr6, len6, ptr7, len7, ptr8, len8, isLikeNone(num_workers) ? 0x100000001 : (num_workers) >>> 0, isLikeNone(batch_size) ? 0x100000001 : (batch_size) >>> 0);
         return ret;
     }
 }
@@ -977,7 +1014,7 @@ function __wbg_get_imports() {
                 const a = state0.a;
                 state0.a = 0;
                 try {
-                    return __wbg_adapter_216(a, state0.b, arg0, arg1);
+                    return __wbg_adapter_217(a, state0.b, arg0, arg1);
                 } finally {
                     state0.a = a;
                 }
@@ -1174,19 +1211,19 @@ function __wbg_get_imports() {
         const ret = false;
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper1232 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 240, __wbg_adapter_52);
+    imports.wbg.__wbindgen_closure_wrapper1259 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 248, __wbg_adapter_52);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper153 = function(arg0, arg1, arg2) {
+    imports.wbg.__wbindgen_closure_wrapper156 = function(arg0, arg1, arg2) {
         const ret = makeMutClosure(arg0, arg1, 6, __wbg_adapter_44);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper155 = function(arg0, arg1, arg2) {
+    imports.wbg.__wbindgen_closure_wrapper158 = function(arg0, arg1, arg2) {
         const ret = makeMutClosure(arg0, arg1, 6, __wbg_adapter_47);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper157 = function(arg0, arg1, arg2) {
+    imports.wbg.__wbindgen_closure_wrapper160 = function(arg0, arg1, arg2) {
         const ret = makeMutClosure(arg0, arg1, 6, __wbg_adapter_44);
         return ret;
     };

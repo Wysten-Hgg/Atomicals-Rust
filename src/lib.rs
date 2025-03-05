@@ -12,6 +12,8 @@ pub use crate::types::{
     Amount, Arc20Config, Arc20Token, AtomicalsTx,
     mint::BitworkInfo, mint::MintConfig, mint::MintResult,
     wasm::{WasmTransaction, WasmBitworkInfo},
+    RealmConfig,
+    subrealm::{SubrealmConfig, SubrealmClaimType},
 };
 
 pub use crate::operations::mining::{

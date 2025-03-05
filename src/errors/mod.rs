@@ -31,6 +31,10 @@ pub enum Error {
     ParentRealmNotFound(String),
     ContainerNotFound(String),
     ParentOwnerInvalid(String),
+    OwnershipError(String),
+    AtomicalNotFound(String),
+    ScriptError(String),
+    NotImplemented(String),
     Other(String),
 }
 
@@ -63,6 +67,10 @@ impl fmt::Display for Error {
             Error::ParentRealmNotFound(msg) => write!(f, "Parent realm not found: {}", msg),
             Error::ContainerNotFound(msg) => write!(f, "Container not found: {}", msg),
             Error::ParentOwnerInvalid(msg) => write!(f, "Invalid parent owner: {}", msg),
+            Error::OwnershipError(msg) => write!(f, "Ownership error: {}", msg),
+            Error::AtomicalNotFound(msg) => write!(f, "Atomical not found: {}", msg),
+            Error::ScriptError(msg) => write!(f, "Script error: {}", msg),
+            Error::NotImplemented(msg) => write!(f, "Not implemented: {}", msg),
             Error::Other(msg) => write!(f, "Other error: {}", msg),
         }
     }

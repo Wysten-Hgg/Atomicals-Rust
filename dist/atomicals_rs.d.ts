@@ -7,6 +7,7 @@ export class AtomicalsWasm {
   constructor();
   mint_ft(tick: string, mint_amount: bigint, bitwork_c?: string | null, bitwork_r?: string | null, num_workers?: number | null, batch_size?: number | null): Promise<any>;
   mint_realm(name: string, sats_output: bigint, bitwork_c?: string | null, bitwork_r?: string | null, container?: string | null, parent?: string | null, parent_owner?: string | null, num_workers?: number | null, batch_size?: number | null): Promise<any>;
+  mint_subrealm(name: string, parent_realm_id: string, claim_type: string, sats_output: bigint, bitwork_c?: string | null, bitwork_r?: string | null, container?: string | null, meta?: string | null, ctx?: string | null, init?: string | null, num_workers?: number | null, batch_size?: number | null): Promise<any>;
 }
 export class MiningOptions {
   free(): void;
@@ -100,6 +101,7 @@ export interface InitOutput {
   readonly atomicalswasm_try_new: () => [number, number, number];
   readonly atomicalswasm_mint_ft: (a: number, b: number, c: number, d: bigint, e: number, f: number, g: number, h: number, i: number, j: number) => any;
   readonly atomicalswasm_mint_realm: (a: number, b: number, c: number, d: bigint, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number) => any;
+  readonly atomicalswasm_mint_subrealm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: bigint, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number) => any;
   readonly wasmtransaction_new: (a: number, b: number) => number;
   readonly rustsecp256k1_v0_9_2_context_create: (a: number) => number;
   readonly rustsecp256k1_v0_9_2_context_destroy: (a: number) => void;
@@ -115,8 +117,8 @@ export interface InitOutput {
   readonly __externref_table_dealloc: (a: number) => void;
   readonly closure5_externref_shim: (a: number, b: number, c: any) => void;
   readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h34ced8d1dcb0005d: (a: number, b: number) => void;
-  readonly closure239_externref_shim: (a: number, b: number, c: any) => void;
-  readonly closure303_externref_shim: (a: number, b: number, c: any, d: any) => void;
+  readonly closure247_externref_shim: (a: number, b: number, c: any) => void;
+  readonly closure311_externref_shim: (a: number, b: number, c: any, d: any) => void;
   readonly __wbindgen_start: () => void;
 }
 

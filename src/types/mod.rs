@@ -5,6 +5,7 @@ pub mod atomicals;
 pub mod wasm;
 pub mod transaction;
 pub mod realm;
+pub mod subrealm;
 
 pub use amount::Amount;
 pub use arc20::{Arc20Config, Arc20Token};
@@ -13,6 +14,7 @@ pub use atomicals::*;
 pub use wasm::*;
 pub use transaction::AtomicalsTx;
 pub use realm::RealmConfig;
+pub use subrealm::{SubrealmConfig, SubrealmClaimType};
 
 use bitcoin::Transaction;
 use serde::{Serialize, Deserialize};
