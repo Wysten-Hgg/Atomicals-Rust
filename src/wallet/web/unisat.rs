@@ -1,13 +1,17 @@
 use crate::errors::{Error, Result};
 use crate::wallet::WalletProvider;
+use crate::types::atomicals::{AtomicalInfo, LocationInfo, AtomicalState};
 use async_trait::async_trait;
 use bitcoin::{Transaction, TxOut, Network, PublicKey};
 use bitcoin::psbt::Psbt;
 use wasm_bindgen::prelude::*;
 use js_sys::{Function, Object, Promise, Reflect, Array};
 use serde_wasm_bindgen::{to_value, from_value};
+use serde::{Deserialize};
+use serde_json::Value;
 use std::str::FromStr;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use reqwest;
 
 #[wasm_bindgen]
 #[derive(Debug)]
@@ -95,6 +99,44 @@ impl WalletProvider for UnisatProvider {
         Psbt::deserialize(&signed_psbt_bytes)
             .map_err(|e| Error::WalletError(format!("Failed to parse signed PSBT: {}", e)))
     }
+
+    async fn get_atomical_by_id(&self, atomical_id: &str) -> Result<AtomicalInfo> {
+        // 使用 UniSat 的 API 获取 Atomical 信息
+        let url = format!(
+            "https://testnet.unisat.io/api/v1/atomical/{}",
+            atomical_id
+        );
+
+        let response = reqwest::get(&url).await
+            .map_err(|e| Error::NetworkError(format!("Failed to fetch atomical info: {}", e)))?;
+            
+        let unisat_response: UnisatResponse = response.json().await
+            .map_err(|e| Error::DeserializationError(format!("Failed to deserialize response: {}", e)))?;
+
+        if unisat_response.code != 0 {
+            return Err(Error::AtomicalNotFound(format!("Atomical {} not found: {}", atomical_id, unisat_response.msg)));
+        }
+
+        // 将 UniSat 的响应格式转换为我们的 AtomicalInfo 格式
+        let mut atomical_info: AtomicalInfo = serde_json::from_value(unisat_response.data)
+            .map_err(|e| Error::DeserializationError(format!("Failed to convert response format: {}", e)))?;
+
+        // 确保 location 字段格式正确
+        if let Some(location) = atomical_info.location_info.first_mut() {
+            if !location.location.contains(':') {
+                location.location = format!("{}:{}", location.txid, location.index);
+            }
+        }
+
+        Ok(atomical_info)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct UnisatResponse {
+    code: i32,
+    msg: String,
+    data: Value,
 }
 
 impl UnisatProvider {

@@ -1,5 +1,6 @@
 use crate::errors::{Error, Result};
 use crate::wallet::{WalletProvider, Utxo};
+use crate::types::atomicals::{AtomicalInfo, AtomicalResponse, AtomicalResponseData};
 use async_trait::async_trait;
 use bitcoin::{Transaction, TxOut, Network, PublicKey, Amount, OutPoint, Psbt, Address, Txid};
 use wasm_bindgen::prelude::*;
@@ -14,6 +15,7 @@ use reqwest;
 use serde_json::Value;
 use bitcoin::hashes::{sha256, Hash};
 use hex;
+
 
 #[derive(Debug, Deserialize)]
 struct UtxoResponse {
@@ -393,6 +395,37 @@ impl WalletProvider for WizzProvider {
         }
         
         Ok(signed_psbt)
+    }
+
+    async fn get_atomical_by_id(&self, atomical_id: &str) -> Result<AtomicalInfo> {
+        let url = format!(
+            "https://eptestnet4.wizz.cash/proxy/blockchain.atomicals.get_state?params=[\"{}\"]&_={}",
+            atomical_id,
+            js_sys::Date::now() as u64
+        );
+
+        let response = reqwest::get(&url).await
+            .map_err(|e| Error::NetworkError(format!("Failed to fetch atomical info: {}", e)))?;
+            
+        let atomical_response: AtomicalResponse = response.json().await
+            .map_err(|e| Error::DeserializationError(format!("Failed to deserialize response: {}", e)))?;
+
+        if !atomical_response.success {
+            return Err(Error::AtomicalNotFound(format!("Atomical {} not found", atomical_id)));
+        }
+
+        let mut result = atomical_response.response.result;
+        
+        // 确保 location 字段格式正确
+        for location in result.location_info.iter_mut() {
+            if !location.location.contains(':') {
+                // 使用 txid 和 index 构建正确的 location 格式
+                location.location = format!("{}:{}", location.txid, location.index);
+                log!("Fixed location format: {} -> {}", location.txid, location.location);
+            }
+        }
+
+        Ok(result)
     }
 }
 

@@ -24,16 +24,6 @@ pub struct AtomicalLocation {
     pub address: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AtomicalInfo {
-    pub atomical_id: String,
-    pub atomical_type: String,
-    pub atomical_number: u64,
-    pub location: Option<AtomicalLocation>,
-    pub mint_info: Option<serde_json::Value>,
-    pub state: Option<serde_json::Value>,
-}
-
 #[async_trait(?Send)]
 pub trait WalletProvider {
     async fn get_network(&self) -> Result<Network>;
@@ -61,8 +51,6 @@ pub trait WalletProvider {
         Err(Error::WalletError("sign_atomicals_transactions not implemented".to_string()))
     }
     
-    // 获取 Atomical 信息
-    async fn get_atomical_by_id(&self, atomical_id: &str) -> Result<AtomicalInfo> {
-        Err(Error::WalletError("get_atomical_by_id not implemented".to_string()))
-    }
+    /// 获取 Atomical 信息
+    async fn get_atomical_by_id(&self, atomical_id: &str) -> Result<crate::types::atomicals::AtomicalInfo>;
 }

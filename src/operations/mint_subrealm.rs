@@ -13,7 +13,8 @@ use bitcoin::{
     transaction::Version, key::XOnlyPublicKey, secp256k1::Secp256k1,
     OutPoint,
 };
-
+use bitcoin::opcodes::all::OP_RETURN;
+use bitcoin::hashes::{sha256, Hash};
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 use serde_wasm_bindgen;
@@ -22,6 +23,7 @@ use serde::{Serialize, Deserialize};
 use web_sys;
 use js_sys;
 use wasm_bindgen_futures;
+use regex::Regex;
 
 #[cfg(target_arch = "wasm32")]
 macro_rules! log {
@@ -100,26 +102,7 @@ fn select_utxos(utxos: &[Utxo], target_amount: Amount, fee_rate: f64) -> Result<
     Err(Error::InvalidAmount("No single UTXO with sufficient funds found".into()))
 }
 
-/// 验证父 Realm 所有权
-async fn verify_parent_realm_ownership<W: WalletProvider>(
-    wallet: &W,
-    parent_realm_id: &str,
-) -> Result<Option<String>> {
-    // 获取钱包地址
-    let address = wallet.get_address().await?;
-    
-    // 获取父 Realm 的 UTXO 信息
-    let parent_info = wallet.get_atomical_by_id(parent_realm_id).await?;
-    
-    // 验证父 Realm 是否由当前钱包拥有
-    let location = parent_info.location.ok_or_else(|| Error::AtomicalNotFound(format!("Parent realm {} not found", parent_realm_id)))?;
-    
-    if location.address == address {
-        Ok(Some(location.address))
-    } else {
-        Ok(None) // 父 Realm 不属于当前钱包
-    }
-}
+
 
 /// 准备 commit-reveal 配置
 async fn prepare_commit_reveal_config(
@@ -145,11 +128,10 @@ async fn prepare_commit_reveal_config(
     }
     
     let tr_script = ScriptBuf::new_v1_p2tr(&secp, *child_node_xonly_pubkey, Some(taproot_info.merkle_root().unwrap()));
-    let tr_address = Address::from_script(&tr_script, network)?;
+    let script_address = Address::from_script(&tr_script, network)?;
     
-    Ok((script, tr_address))
+    Ok((script, script_address))
 }
-
 /// 铸造 Subrealm
 pub async fn mint_subrealm<W: WalletProvider>(
     wallet: &W,
@@ -176,6 +158,67 @@ pub async fn mint_subrealm<W: WalletProvider>(
 
     let pubkey = wallet.get_public_key().await?;
     let (xonly_pubkey, _parity) = pubkey.inner.x_only_public_key();
+
+    // 获取父 Realm 的 UTXO 并验证所有权
+    let parent_info = wallet.get_atomical_by_id(&config.parent_realm_id).await?;
+    let parent_location = parent_info.get_current_location()
+        .ok_or_else(|| Error::AtomicalNotFound(format!("Parent realm {} not found", config.parent_realm_id)))?;
+    let parent_script = ScriptBuf::from_hex(&parent_location.script)
+        .map_err(|e| Error::ScriptError(format!("Failed to parse parent realm script: {}", e)))?;
+    
+    let parent_outpoint = OutPoint::from_str(&parent_location.location)
+        .map_err(|e| Error::InvalidInput(format!("Invalid parent location: {}", e)))?;
+
+    log!("Parent location info - location: {}, txid: {}, index: {}", 
+        parent_location.location,
+        parent_location.txid,
+        parent_location.index
+    );
+
+    // 验证 location 格式
+    if !parent_location.location.contains(':') {
+        return Err(Error::InvalidInput(format!("Invalid parent location: {}", parent_location.location)));
+    }
+    let location_parts: Vec<&str> = parent_location.location.split(':').collect();
+    if location_parts.len() != 2 {
+        return Err(Error::InvalidInput("Invalid parent location: OutPoint not in <txid>:<vout> format".into()));
+    }
+    
+    let script_pubkey = address.script_pubkey();
+    
+    // 计算 scripthash (Electrum 格式)
+    let script_bytes = script_pubkey.as_bytes();
+    let hash = sha256::Hash::hash(&sha256::Hash::hash(script_bytes).to_byte_array());
+    
+    // 反转字节序并转换为十六进制字符串
+    let scripthash = hash.to_byte_array()
+        .iter()
+        .rev()
+        .map(|b| format!("{:02x}", b))
+        .collect::<String>();
+    // 验证父 Realm 所有权
+    log!("parent_location.scripthash: {} current scripthash {})", 
+    parent_location.scripthash, 
+    scripthash
+    );
+    if parent_location.scripthash != scripthash {
+        return Err(Error::OwnershipError("Parent realm not owned by current wallet".into()));
+    }
+
+
+    // 获取父 Realm 的 subrealm 规则
+    let state = parent_info.state.clone().ok_or_else(|| Error::InvalidInput("Parent realm has no state".into()))?;
+    let latest = state.latest.ok_or_else(|| Error::InvalidInput("Parent realm has no latest state".into()))?;
+    let subrealms = latest.subrealms.ok_or_else(|| Error::InvalidInput("Parent realm has no subrealm rules".into()))?;
+    let subrealm_rules = subrealms.rules;
+    // 验证 subrealm 名称是否符合规则
+    if !subrealm_rules.iter().any(|rule| {
+        Regex::new(&rule.p)
+            .map(|re| re.is_match(subrealm_part.clone()))
+            .unwrap_or(false)
+    }) {
+        return Err(Error::InvalidInput("Subrealm name does not match any rules".into()));
+    }
 
     // 构建 atomicals payload
     let payload = PayloadWrapper {
@@ -234,16 +277,16 @@ pub async fn mint_subrealm<W: WalletProvider>(
     // 获取网络费率
     let fee_rate = wallet.get_network_fee_rate().await?;
     
-    // 计算reveal交易所需费用
+    // 计算reveal交易所需费用（现在包括两个输入和一个输出）
     let reveal_size = tx_size::calculate_reveal_size(
-        1, // 一个reveal input
-        1, // 一个输出
+        2, // 两个输入：commit输出和父realm
+        3, // 一个合并的输出
         script.len(), // hash_lock script长度
     );
     let reveal_fee = if config.bitworkr.is_some() {
         Amount::from_sat((reveal_size * fee_rate * 1.2) as u64) // 增加 20% 的手续费
     } else {
-        Amount::from_sat((reveal_size * fee_rate) as u64)
+        Amount::from_sat((reveal_size * fee_rate * 2.0) as u64)
     };
     
     log!("Calculated reveal fee: {} sats (BitworkR: {})", 
@@ -252,11 +295,11 @@ pub async fn mint_subrealm<W: WalletProvider>(
     );
     
     // 计算commit交易输出值（需要考虑reveal交易的输入和输出）
-    let commit_output_value = reveal_fee + Amount::from_sat(config.sats_output);
+    let commit_output_value = reveal_fee + Amount::from_sat(config.sats_output + parent_location.value);
     
     // 计算commit交易本身的费用
     let commit_size = tx_size::calculate_commit_size(
-        1, // 一个输入
+        1, // 一个输入（资金输入）
         2, // 两个输出（P2TR输出和找零）
     );
     let commit_fee = Amount::from_sat((commit_size * fee_rate) as u64);
@@ -269,15 +312,16 @@ pub async fn mint_subrealm<W: WalletProvider>(
     )?;
     
     // 创建交易输入
-    let inputs: Vec<TxIn> = selected_utxos.iter()
-        .map(|utxo| TxIn {
-            previous_output: utxo.outpoint,
+    let mut inputs = vec![
+        // 添加其他资金输入
+        TxIn {
+            previous_output: selected_utxos[0].outpoint,
             script_sig: ScriptBuf::new(),
             sequence: Sequence::ZERO,
             witness: Default::default(),
-        })
-        .collect();
-    
+        },
+    ];
+
     // 计算总输入金额
     let total_input = selected_utxos.iter()
         .try_fold(Amount::from_sat(0), |acc, utxo| {
@@ -294,15 +338,16 @@ pub async fn mint_subrealm<W: WalletProvider>(
         None => return Err(Error::InvalidAmount("Not enough funds to cover fees".into())),
     };
 
-    // 创建 commit 交易输出
+    // 创建 commit 交易输出，确保正确的顺序
     let mut commit_outputs = vec![
+        // 第一个输出是 subrealm 的位置
         TxOut {
             value: commit_output_value,
             script_pubkey: script_address.script_pubkey(),
         },
     ];
     
-    // 如果有找零，添加找零输出
+    // 如果有找零，添加到最后
     if change_amount > Amount::from_sat(546) {
         commit_outputs.push(TxOut {
             value: change_amount,
@@ -311,7 +356,7 @@ pub async fn mint_subrealm<W: WalletProvider>(
     }
 
     let commit_tx = Transaction {
-        version: Version(2),
+        version: Version(1),
         lock_time: bitcoin::absolute::LockTime::ZERO,
         input: inputs,
         output: commit_outputs,
@@ -320,13 +365,14 @@ pub async fn mint_subrealm<W: WalletProvider>(
     let mut commit_psbt = Psbt::from_unsigned_tx(commit_tx.clone())
         .map_err(|e| Error::PsbtError(format!("Failed to create commit PSBT: {}", e)))?;
         
-    // 添加输入的 UTXO 信息到 PSBT
+    // 添加其他输入的 UTXO 信息到 PSBT
     for (i, utxo) in selected_utxos.iter().enumerate() {
-        commit_psbt.inputs[i].witness_utxo = Some(utxo.txout.clone());
-        commit_psbt.inputs[i].tap_internal_key = Some(xonly_pubkey);
+        let psbt_index = i; // 因为没有父 Realm 输入
+        commit_psbt.inputs[psbt_index].witness_utxo = Some(utxo.txout.clone());
+        commit_psbt.inputs[psbt_index].tap_internal_key = Some(xonly_pubkey);
         let mut origins = std::collections::BTreeMap::new();
         origins.insert(xonly_pubkey, (vec![], (bitcoin::bip32::Fingerprint::default(), bitcoin::bip32::DerivationPath::default())));
-        commit_psbt.inputs[i].tap_key_origins = origins;
+        commit_psbt.inputs[psbt_index].tap_key_origins = origins.clone();
     }
     
     log!("Created commit PSBT");
@@ -376,36 +422,74 @@ pub async fn mint_subrealm<W: WalletProvider>(
     }
 
     // 创建 reveal 交易
-    let reveal_input = TxIn {
-        previous_output: OutPoint::new(mined_commit_tx.txid(), 0),
-        script_sig: ScriptBuf::new(),
-        sequence: Sequence::ZERO,
-        witness: Default::default(),
-    };
+    let reveal_inputs = vec![
+        TxIn {  // commit 输出放在第一位
+            previous_output: OutPoint::new(mined_commit_tx.txid(), 0),
+            script_sig: ScriptBuf::new(),
+            sequence: Sequence::ZERO,
+            witness: Default::default(),
+        },
+        TxIn {  // 父 Realm 输入放在第二位
+            previous_output: parent_outpoint,
+            script_sig: ScriptBuf::new(),
+            sequence: Sequence::ZERO,
+            witness: Default::default(),
+        },
+    ];
+
+    // // 构建 OP_RETURN 输出
+    // let op_return_script = ScriptBuf::builder()
+    //     .push_opcode(OP_RETURN)
+    //     .push_slice(<&bitcoin::script::PushBytes>::try_from(b"atom").unwrap())
+    //     .push_slice(<&bitcoin::script::PushBytes>::try_from(b"nft").unwrap())
+    //     .push_slice(<&bitcoin::script::PushBytes>::try_from(&atomicals_payload[..]).unwrap())
+    //     .into_script();
 
     let reveal_tx = Transaction {
-        version: Version(2),
+        version: Version(1),
         lock_time: bitcoin::absolute::LockTime::ZERO,
-        input: vec![reveal_input],
+        input: reveal_inputs,
         output: vec![
-            TxOut {
+            TxOut {  // Subrealm 输出放在第一位
                 value: Amount::from_sat(config.sats_output),
-                script_pubkey: address.script_pubkey(),
+                script_pubkey: address.script_pubkey().clone(),
             },
+            TxOut {  // 父 Realm 返回放在第二位
+                value: Amount::from_sat(parent_location.value),
+                script_pubkey: parent_script.clone(),
+            },
+            // TxOut {  // OP_RETURN 输出放在最后
+            //     value: Amount::from_sat(0),
+            //     script_pubkey: op_return_script,
+            // },
         ],
     };
 
     let mut reveal_psbt = Psbt::from_unsigned_tx(reveal_tx.clone())
         .map_err(|e| Error::PsbtError(format!("Failed to create reveal PSBT: {}", e)))?;
 
-    // 添加reveal交易的witness_script和tap_internal_key
+    // 从父Realm的script中提取公钥
+    let parent_internal_key = {
+        // 移除OP_1前缀(0x51)和PUSHBYTES_32前缀(0x20)
+        let pubkey_hex = parent_script.as_bytes()
+            .get(2..)
+            .ok_or_else(|| Error::TransactionError("Invalid parent script length".into()))?;
+        XOnlyPublicKey::from_slice(pubkey_hex)
+            .map_err(|e| Error::TransactionError(format!("Failed to parse parent internal key: {}", e)))?
+    };
+
+    // 第一个输入保持不变
     reveal_psbt.inputs[0].witness_script = Some(script.clone());
     reveal_psbt.inputs[0].tap_internal_key = Some(xonly_pubkey);
-    let mut origins = std::collections::BTreeMap::new();
-    origins.insert(xonly_pubkey, (vec![], (bitcoin::bip32::Fingerprint::default(), bitcoin::bip32::DerivationPath::default())));
-    reveal_psbt.inputs[0].tap_key_origins = origins;
     reveal_psbt.inputs[0].witness_utxo = Some(mined_commit_tx.output[0].clone());
-    
+
+    // 第二个输入使用父Realm的公钥
+    reveal_psbt.inputs[1].witness_utxo = Some(TxOut {
+        value: Amount::from_sat(parent_location.value),
+        script_pubkey: parent_script.clone(),
+    });
+    reveal_psbt.inputs[1].tap_internal_key = Some(parent_internal_key);
+
     // 添加 Taproot 特定字段
     let secp = Secp256k1::new();
     let mut builder = TaprootBuilder::new();
@@ -426,7 +510,7 @@ pub async fn mint_subrealm<W: WalletProvider>(
     let mut tap_scripts = std::collections::BTreeMap::new();
     tap_scripts.insert(control_block.clone(), (script.clone(), LeafVersion::TapScript));
     reveal_psbt.inputs[0].tap_scripts = tap_scripts;
-    
+
     log!("Created reveal PSBT with Taproot script");
 
     // Mine transactions if needed

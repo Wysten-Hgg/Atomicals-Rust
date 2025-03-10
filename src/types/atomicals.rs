@@ -103,3 +103,65 @@ impl AtomicalsPayload {
 /// Atomicals 协议的常量定义
 pub const ATOMICALS_PROTOCOL_ENVELOPE: &[u8] = b"atom";
 pub const ATOMICALS_PROTOCOL_VERSION: u8 = 1;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LocationInfo {
+    pub atomicals_at_location: Vec<String>,
+    pub index: u32,
+    pub location: String,
+    pub script: String,
+    pub scripthash: String,
+    pub tx_num: u64,
+    pub txid: String,
+    pub value: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AtomicalState {
+    pub latest: Option<LatestState>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LatestState {
+    pub subrealms: Option<SubrealmsState>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SubrealmsState {
+    pub rules: Vec<SubrealmRule>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SubrealmRule {
+    pub bitworkc: Option<String>,
+    pub p: String,
+    pub o: serde_json::Value,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AtomicalResponse {
+    pub success: bool,
+    pub response: AtomicalResponseData,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AtomicalResponseData {
+    pub result: AtomicalInfo,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AtomicalInfo {
+    pub atomical_id: String,
+    pub confirmed: bool,
+    pub location_info: Vec<LocationInfo>,
+    pub state: Option<AtomicalState>,
+    pub subtype: Option<String>,
+    #[serde(rename = "type")]
+    pub atomical_type: String,
+}
+
+impl AtomicalInfo {
+    pub fn get_current_location(&self) -> Option<&LocationInfo> {
+        self.location_info.first()
+    }
+}
