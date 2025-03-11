@@ -156,6 +156,7 @@ impl Atomicals {
             init: init_value,
             sats_output,
             fee_rate: None, // 使用网络费率
+            rule_outputs: None, // 规则输出在验证规则时设置
         };
 
         // 创建挖矿选项

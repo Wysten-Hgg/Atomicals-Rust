@@ -1,5 +1,6 @@
 use serde::{Serialize, Deserialize};
 use bitcoin::Amount;
+use bitcoin::ScriptBuf;
 
 /// Subrealm 铸造类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -17,6 +18,31 @@ impl SubrealmClaimType {
             SubrealmClaimType::Rule => "rule",
         }
     }
+}
+
+/// Subrealm 规则输出
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuleOutput {
+    /// 支付金额（聪）
+    pub v: u64,
+    /// 可选的 token id
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+}
+
+/// Subrealm 规则
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubrealmRule {
+    /// 规则模式（正则表达式）
+    pub p: String,
+    /// 输出规则映射 (script -> RuleOutput)
+    pub o: std::collections::HashMap<String, RuleOutput>,
+    /// Commit 交易的工作量证明要求
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bitworkc: Option<String>,
+    /// Reveal 交易的工作量证明要求
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bitworkr: Option<String>,
 }
 
 /// Subrealm 配置
@@ -44,6 +70,9 @@ pub struct SubrealmConfig {
     pub init: Option<serde_json::Value>,
     /// 手续费率（聪/字节）
     pub fee_rate: Option<f64>,
+    /// 规则铸造的支付输出
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rule_outputs: Option<Vec<(ScriptBuf, RuleOutput)>>,
 }
 
 impl SubrealmConfig {
@@ -60,6 +89,7 @@ impl SubrealmConfig {
             ctx: None,
             init: None,
             fee_rate: None,
+            rule_outputs: None,
         }
     }
 
@@ -90,6 +120,12 @@ impl SubrealmConfig {
         }
 
         Ok(())
+    }
+
+    /// 设置规则铸造的支付输出
+    pub fn with_rule_outputs(mut self, outputs: Vec<(ScriptBuf, RuleOutput)>) -> Self {
+        self.rule_outputs = Some(outputs);
+        self
     }
 
     /// 设置 commit 交易的工作量证明

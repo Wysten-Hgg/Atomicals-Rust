@@ -1,4 +1,4 @@
-use crate::types::{AtomicalsTx, subrealm::{SubrealmConfig, SubrealmClaimType}};
+use crate::types::{AtomicalsTx, subrealm::{SubrealmConfig, SubrealmClaimType, SubrealmRule, RuleOutput}};
 use crate::types::mint::{BitworkInfo, MintConfig, MintResult};
 use crate::errors::{Error, Result};
 use crate::wallet::{WalletProvider, Utxo};
@@ -24,6 +24,7 @@ use web_sys;
 use js_sys;
 use wasm_bindgen_futures;
 use regex::Regex;
+use std::collections::HashMap;
 
 #[cfg(target_arch = "wasm32")]
 macro_rules! log {
@@ -63,47 +64,6 @@ pub struct Payload {
     pub init: Option<serde_json::Value>,
 }
 
-fn select_utxos(utxos: &[Utxo], target_amount: Amount, fee_rate: f64) -> Result<(Vec<Utxo>, Amount)> {
-    // 预计输出的脚本类型（假设都是 P2WPKH）
-    let output_types = vec![
-        ScriptType::P2WPKH, // commit tx 的第一个输出
-        ScriptType::P2WPKH, // commit tx 的第二个输出
-    ];
-    
-    // 找到第一个满足条件的UTXO
-    for utxo in utxos {
-        let mut selected_utxos = vec![utxo.clone()];
-        
-        // 获取输入的脚本类型
-        let script_type = ScriptType::from_script(&utxo.txout.script_pubkey)
-            .ok_or_else(|| Error::TransactionError("Unsupported script type".into()))?;
-            
-        // 构建输入类型列表
-        let input_types = vec![script_type];
-            
-        // 计算当前交易大小
-        let tx_size = tx_size::calculate_tx_size(
-            &input_types,
-            &output_types,
-            true  // 有 OP_RETURN 输出
-        );
-        
-        // 计算预估手续费
-        let fee = Amount::from_sat((tx_size.total_vsize as f64 * fee_rate) as u64);
-        
-        // 检查单个UTXO是否满足金额要求
-        if let Some(remaining) = utxo.txout.value.checked_sub(fee) {
-            if remaining >= target_amount {
-                return Ok((selected_utxos, fee));
-            }
-        }
-    }
-    
-    Err(Error::InvalidAmount("No single UTXO with sufficient funds found".into()))
-}
-
-
-
 /// 准备 commit-reveal 配置
 async fn prepare_commit_reveal_config(
     op_type: &str,
@@ -132,10 +92,11 @@ async fn prepare_commit_reveal_config(
     
     Ok((script, script_address))
 }
+
 /// 铸造 Subrealm
 pub async fn mint_subrealm<W: WalletProvider>(
     wallet: &W,
-    config: SubrealmConfig,
+    mut config: SubrealmConfig,
     mining_options: Option<MiningOptions>,
 ) -> Result<AtomicalsTx> {
     log!("Starting mint_subrealm operation...");
@@ -201,23 +162,58 @@ pub async fn mint_subrealm<W: WalletProvider>(
     parent_location.scripthash, 
     scripthash
     );
-    if parent_location.scripthash != scripthash {
+    if config.claim_type == SubrealmClaimType::Direct && parent_location.scripthash != scripthash {
         return Err(Error::OwnershipError("Parent realm not owned by current wallet".into()));
     }
 
-
     // 获取父 Realm 的 subrealm 规则
-    let state = parent_info.state.clone().ok_or_else(|| Error::InvalidInput("Parent realm has no state".into()))?;
-    let latest = state.latest.ok_or_else(|| Error::InvalidInput("Parent realm has no latest state".into()))?;
-    let subrealms = latest.subrealms.ok_or_else(|| Error::InvalidInput("Parent realm has no subrealm rules".into()))?;
-    let subrealm_rules = subrealms.rules;
-    // 验证 subrealm 名称是否符合规则
-    if !subrealm_rules.iter().any(|rule| {
-        Regex::new(&rule.p)
-            .map(|re| re.is_match(subrealm_part.clone()))
-            .unwrap_or(false)
-    }) {
-        return Err(Error::InvalidInput("Subrealm name does not match any rules".into()));
+    let subrealms = match &parent_info.state {
+        Some(state) => state.latest.as_ref()
+            .and_then(|latest| latest.subrealms.as_ref())
+            .ok_or_else(|| Error::InvalidInput("Parent realm has no subrealm rules".into()))?,
+        None => return Err(Error::InvalidInput("Parent realm has no state".into())),
+    };
+
+    // 检查规则数组是否为空
+    if subrealms.rules.is_empty() {
+        return Err(Error::InvalidInput("Parent realm has no rules".into()));
+    }
+
+    // 根据铸造类型选择规则
+    let matched_rule = if config.claim_type == SubrealmClaimType::Rule {
+        let mut matched = None;
+        for rule in &subrealms.rules {
+            if let Ok(re) = Regex::new(&format!("^{}$", &rule.p)) {
+                if re.is_match(&subrealm_part.to_string().clone()) {
+                    // 验证规则中的价格范围
+                    if let Some(outputs) = rule.o.as_object() {
+                        for (_, output) in outputs {
+                            if let Some(price) = output.get("v").and_then(|v| v.as_u64()) {
+                                if price == 0 || price > 100000000 {
+                                    return Err(Error::InvalidInput(format!(
+                                        "Invalid price in rule: {} sats. Must be between 1 and 100000000 sats",
+                                        price
+                                    )));
+                                }
+                            }
+                        }
+                    }
+                    matched = Some(rule);
+                    break;
+                }
+            }
+        }
+        matched.ok_or_else(|| Error::InvalidInput("No matching rule found".into()))?
+    } else {
+        // 直接铸造使用第一条规则
+        &subrealms.rules[0]
+    };
+
+    // 设置工作量证明要求
+    if config.claim_type == SubrealmClaimType::Rule {
+        if let Some(bitworkc) = &matched_rule.bitworkc {
+            config.bitworkc = Some(bitworkc.clone());
+        }
     }
 
     // 构建 atomicals payload
@@ -286,7 +282,7 @@ pub async fn mint_subrealm<W: WalletProvider>(
     let reveal_fee = if config.bitworkr.is_some() {
         Amount::from_sat((reveal_size * fee_rate * 1.2) as u64) // 增加 20% 的手续费
     } else {
-        Amount::from_sat((reveal_size * fee_rate * 2.0) as u64)
+        Amount::from_sat((reveal_size * fee_rate) as u64)
     };
     
     log!("Calculated reveal fee: {} sats (BitworkR: {})", 
@@ -308,7 +304,8 @@ pub async fn mint_subrealm<W: WalletProvider>(
     let (selected_utxos, _) = select_utxos(
         &utxos,
         commit_output_value + commit_fee,
-        fee_rate
+        fee_rate,
+        0
     )?;
     
     // 创建交易输入
@@ -346,7 +343,7 @@ pub async fn mint_subrealm<W: WalletProvider>(
             script_pubkey: script_address.script_pubkey(),
         },
     ];
-    
+
     // 如果有找零，添加到最后
     if change_amount > Amount::from_sat(546) {
         commit_outputs.push(TxOut {
@@ -422,75 +419,72 @@ pub async fn mint_subrealm<W: WalletProvider>(
     }
 
     // 创建 reveal 交易
-    let reveal_inputs = vec![
+    let mut reveal_inputs = vec![
         TxIn {  // commit 输出放在第一位
             previous_output: OutPoint::new(mined_commit_tx.txid(), 0),
             script_sig: ScriptBuf::new(),
             sequence: Sequence::ZERO,
             witness: Default::default(),
         },
-        TxIn {  // 父 Realm 输入放在第二位
+    ];
+    if config.claim_type == SubrealmClaimType::Direct {
+        reveal_inputs.push(TxIn {  // 父 Realm 输入放在第二位
             previous_output: parent_outpoint,
             script_sig: ScriptBuf::new(),
             sequence: Sequence::ZERO,
             witness: Default::default(),
-        },
-    ];
+        });
+    }
 
-    // // 构建 OP_RETURN 输出
-    // let op_return_script = ScriptBuf::builder()
-    //     .push_opcode(OP_RETURN)
-    //     .push_slice(<&bitcoin::script::PushBytes>::try_from(b"atom").unwrap())
-    //     .push_slice(<&bitcoin::script::PushBytes>::try_from(b"nft").unwrap())
-    //     .push_slice(<&bitcoin::script::PushBytes>::try_from(&atomicals_payload[..]).unwrap())
-    //     .into_script();
     log!("Subrealm Amount: {:?}", Amount::from_sat(config.sats_output.clone()));
     log!("Realm Amount: {:?}", Amount::from_sat(parent_location.value.clone()));
+    let mut reveal_outputs = vec![
+        TxOut {  // Subrealm 输出放在第一位
+            value: Amount::from_sat(config.sats_output),
+            script_pubkey: address.script_pubkey().clone(),
+        },
+    ];
+    if config.claim_type == SubrealmClaimType::Direct {
+        reveal_outputs.push(TxOut {  // 父 Realm 返回放在第二位
+            value: Amount::from_sat(parent_location.value),
+            script_pubkey: parent_script.clone(),
+        });
+    }
+  
     let reveal_tx = Transaction {
         version: Version(1),
         lock_time: bitcoin::absolute::LockTime::ZERO,
         input: reveal_inputs,
-        output: vec![
-            TxOut {  // Subrealm 输出放在第一位
-                value: Amount::from_sat(config.sats_output),
-                script_pubkey: address.script_pubkey().clone(),
-            },
-            TxOut {  // 父 Realm 返回放在第二位
-                value: Amount::from_sat(parent_location.value),
-                script_pubkey: parent_script.clone(),
-            },
-            // TxOut {  // OP_RETURN 输出放在最后
-            //     value: Amount::from_sat(0),
-            //     script_pubkey: op_return_script,
-            // },
-        ],
+        output: reveal_outputs,
     };
 
     let mut reveal_psbt = Psbt::from_unsigned_tx(reveal_tx.clone())
         .map_err(|e| Error::PsbtError(format!("Failed to create reveal PSBT: {}", e)))?;
 
-    // 从父Realm的script中提取公钥
-    let parent_internal_key = {
-        // 移除OP_1前缀(0x51)和PUSHBYTES_32前缀(0x20)
-        let pubkey_hex = parent_script.as_bytes()
-            .get(2..)
-            .ok_or_else(|| Error::TransactionError("Invalid parent script length".into()))?;
-        XOnlyPublicKey::from_slice(pubkey_hex)
-            .map_err(|e| Error::TransactionError(format!("Failed to parse parent internal key: {}", e)))?
-    };
+   
 
     // 第一个输入保持不变
     reveal_psbt.inputs[0].witness_script = Some(script.clone());
     reveal_psbt.inputs[0].tap_internal_key = Some(xonly_pubkey);
     reveal_psbt.inputs[0].witness_utxo = Some(mined_commit_tx.output[0].clone());
 
-    // 第二个输入使用父Realm的公钥
-    reveal_psbt.inputs[1].witness_utxo = Some(TxOut {
-        value: Amount::from_sat(parent_location.value),
-        script_pubkey: parent_script.clone(),
-    });
-    reveal_psbt.inputs[1].tap_internal_key = Some(parent_internal_key);
-
+    if config.claim_type == SubrealmClaimType::Direct {
+         // 从父Realm的script中提取公钥
+        let parent_internal_key = {
+            // 移除OP_1前缀(0x51)和PUSHBYTES_32前缀(0x20)
+            let pubkey_hex = parent_script.as_bytes()
+                .get(2..)
+                .ok_or_else(|| Error::TransactionError("Invalid parent script length".into()))?;
+            XOnlyPublicKey::from_slice(pubkey_hex)
+                .map_err(|e| Error::TransactionError(format!("Failed to parse parent internal key: {}", e)))?
+        };
+        // 第二个输入使用父Realm的公钥
+        reveal_psbt.inputs[1].witness_utxo = Some(TxOut {
+            value: Amount::from_sat(parent_location.value),
+            script_pubkey: parent_script.clone(),
+        });
+        reveal_psbt.inputs[1].tap_internal_key = Some(parent_internal_key);
+    }
     // 添加 Taproot 特定字段
     let secp = Secp256k1::new();
     let mut builder = TaprootBuilder::new();
@@ -601,4 +595,48 @@ pub async fn mint_subrealm<W: WalletProvider>(
     );
 
     Ok(atomicals_tx)
+}
+
+fn select_utxos(utxos: &[Utxo], target_amount: Amount, fee_rate: f64, additional_outputs: usize) -> Result<(Vec<Utxo>, Amount)> {
+    // 预计输出的脚本类型
+    let mut output_types = vec![
+        ScriptType::P2WPKH, // commit tx 的第一个输出
+        ScriptType::P2WPKH, // commit tx 的第二个输出
+    ];
+    
+    // 添加额外输出的脚本类型
+    for _ in 0..additional_outputs {
+        output_types.push(ScriptType::P2WPKH);
+    }
+    
+    // 找到第一个满足条件的UTXO
+    for utxo in utxos {
+        let mut selected_utxos = vec![utxo.clone()];
+        
+        // 获取输入的脚本类型
+        let script_type = ScriptType::from_script(&utxo.txout.script_pubkey)
+            .ok_or_else(|| Error::TransactionError("Unsupported script type".into()))?;
+            
+        // 构建输入类型列表
+        let input_types = vec![script_type];
+            
+        // 计算当前交易大小
+        let tx_size = tx_size::calculate_tx_size(
+            &input_types,
+            &output_types,
+            true  // 有 OP_RETURN 输出
+        );
+        
+        // 计算预估手续费
+        let fee = Amount::from_sat((tx_size.total_vsize as f64 * fee_rate) as u64);
+        
+        // 检查单个UTXO是否满足金额要求
+        if let Some(remaining) = utxo.txout.value.checked_sub(fee) {
+            if remaining >= target_amount {
+                return Ok((selected_utxos, fee));
+            }
+        }
+    }
+    
+    Err(Error::InvalidAmount("No single UTXO with sufficient funds found".into()))
 }
