@@ -117,8 +117,8 @@ export interface InitOutput {
   readonly __externref_table_dealloc: (a: number) => void;
   readonly closure5_externref_shim: (a: number, b: number, c: any) => void;
   readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h5655187db0599bb8: (a: number, b: number) => void;
-  readonly closure841_externref_shim: (a: number, b: number, c: any) => void;
-  readonly closure908_externref_shim: (a: number, b: number, c: any, d: any) => void;
+  readonly closure842_externref_shim: (a: number, b: number, c: any) => void;
+  readonly closure916_externref_shim: (a: number, b: number, c: any, d: any) => void;
   readonly __wbindgen_start: () => void;
 }
 

@@ -444,7 +444,8 @@ pub async fn mint_subrealm<W: WalletProvider>(
     //     .push_slice(<&bitcoin::script::PushBytes>::try_from(b"nft").unwrap())
     //     .push_slice(<&bitcoin::script::PushBytes>::try_from(&atomicals_payload[..]).unwrap())
     //     .into_script();
-
+    log!("Subrealm Amount: {:?}", Amount::from_sat(config.sats_output.clone()));
+    log!("Realm Amount: {:?}", Amount::from_sat(parent_location.value.clone()));
     let reveal_tx = Transaction {
         version: Version(1),
         lock_time: bitcoin::absolute::LockTime::ZERO,
